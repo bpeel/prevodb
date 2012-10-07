@@ -59,6 +59,10 @@ options[] =
       "complete", 'c', 0, G_OPTION_ARG_NONE, &option_complete,
       "Show completions for the word instead of an article", NULL
     },
+    {
+      "raw", 'r', 0, G_OPTION_ARG_NONE, &option_raw,
+      "Show the raw nroff doc instead of piping it through man", NULL
+    },
     { NULL, 0, 0, 0, NULL, NULL, NULL }
   };
 
@@ -654,7 +658,7 @@ show_article (PdbFile *file,
   guint32 article_offset;
   guint32 article_size;
   size_t article_end;
-  PdbGroff *groff;
+  PdbGroff *groff = NULL;
   FILE *out;
   gboolean ret = TRUE;
 
@@ -680,12 +684,17 @@ show_article (PdbFile *file,
 
   article_end = file->pos + article_size;
 
-  groff = pdb_groff_new (error);
+  if (option_raw)
+    out = stdout;
+  else
+    {
+      groff = pdb_groff_new (error);
 
-  if (groff == NULL)
-    return FALSE;
+      if (groff == NULL)
+        return FALSE;
 
-  out = pdb_groff_get_output (groff);
+      out = pdb_groff_get_output (groff);
+    }
 
   while (file->pos < article_end)
     if (show_spanned_string (file, out, error))
@@ -696,13 +705,14 @@ show_article (PdbFile *file,
         break;
       }
 
-  if (ret)
+  if (ret && groff)
     {
       if (!pdb_groff_display (groff, error))
         ret = FALSE;
     }
 
-  pdb_groff_free (groff);
+  if (groff)
+    pdb_groff_free (groff);
 
   return ret;
 }
