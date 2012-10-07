@@ -15,35 +15,35 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef PDB_GROFF_H
-#define PDB_GROFF_H
+#ifndef PDB_MAN_H
+#define PDB_MAN_H
 
 #include <glib.h>
 #include <stdio.h>
 
-#define PDB_GROFF_ERROR (pdb_groff_error_quark ())
+#define PDB_MAN_ERROR (pdb_man_error_quark ())
 
-typedef struct _PdbGroff PdbGroff;
+typedef struct _PdbMan PdbMan;
 
 typedef enum
 {
-  PDB_GROFF_ERROR_STATUS
+  PDB_MAN_ERROR_STATUS
 } PbbGroffError;
 
-PdbGroff *
-pdb_groff_new (GError **error);
+PdbMan *
+pdb_man_new (GError **error);
 
 gboolean
-pdb_groff_display (PdbGroff *groff,
-                   GError **error);
+pdb_man_display (PdbMan *groff,
+                 GError **error);
 
 FILE *
-pdb_groff_get_output (PdbGroff *groff);
+pdb_man_get_output (PdbMan *groff);
 
 void
-pdb_groff_free (PdbGroff *groff);
+pdb_man_free (PdbMan *groff);
 
 GQuark
-pdb_groff_error_quark (void);
+pdb_man_error_quark (void);
 
-#endif /* PDB_GROFF_H */
+#endif /* PDB_MAN_H */

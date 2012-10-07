@@ -24,15 +24,15 @@
 #include <errno.h>
 #include <unistd.h>
 
-#include "pdb-groff.h"
+#include "pdb-man.h"
 
 static const char *
-pdb_groff_args[] =
+pdb_man_args[] =
   {
-    "/bin/sh", "-c", "groff -Tutf8 -Kutf8 -mandoc | less -s", NULL
+    "man", "-l", "-", NULL
   };
 
-struct _PdbGroff
+struct _PdbMan
 {
   GPid pid;
   FILE *stdin_stream;
@@ -52,16 +52,17 @@ kill_process (GPid pid)
     }
 }
 
-PdbGroff *
-pdb_groff_new (GError **error)
+PdbMan *
+pdb_man_new (GError **error)
 {
   GPid pid;
   int stdin_fd;
 
   if (g_spawn_async_with_pipes (NULL, /* working_dir */
-                                (char **) pdb_groff_args,
+                                (char **) pdb_man_args,
                                 NULL, /* envp */
-                                G_SPAWN_DO_NOT_REAP_CHILD,
+                                G_SPAWN_DO_NOT_REAP_CHILD |
+                                G_SPAWN_SEARCH_PATH,
                                 NULL, /* child_setup_func */
                                 NULL, /* user_data */
                                 &pid,
@@ -88,7 +89,7 @@ pdb_groff_new (GError **error)
         }
       else
         {
-          PdbGroff *groff = g_slice_new (PdbGroff);
+          PdbMan *groff = g_slice_new (PdbMan);
 
           groff->stdin_stream = stdin_stream;
           groff->pid = pid;
@@ -101,8 +102,8 @@ pdb_groff_new (GError **error)
 }
 
 gboolean
-pdb_groff_display (PdbGroff *groff,
-                   GError **error)
+pdb_man_display (PdbMan *groff,
+                 GError **error)
 {
   int wait_ret;
   int status;
@@ -137,8 +138,8 @@ pdb_groff_display (PdbGroff *groff,
   if (status != 0)
     {
       g_set_error (error,
-                   PDB_GROFF_ERROR,
-                   PDB_GROFF_ERROR_STATUS,
+                   PDB_MAN_ERROR,
+                   PDB_MAN_ERROR_STATUS,
                    "Failed to run groff");
       return FALSE;
     }
@@ -147,13 +148,13 @@ pdb_groff_display (PdbGroff *groff,
 }
 
 FILE *
-pdb_groff_get_output (PdbGroff *groff)
+pdb_man_get_output (PdbMan *groff)
 {
   return groff->stdin_stream;
 }
 
 void
-pdb_groff_free (PdbGroff *groff)
+pdb_man_free (PdbMan *groff)
 {
   if (groff->stdin_stream)
     fclose (groff->stdin_stream);
@@ -161,11 +162,11 @@ pdb_groff_free (PdbGroff *groff)
   if (groff->pid)
     kill_process (groff->pid);
 
-  g_slice_free (PdbGroff, groff);
+  g_slice_free (PdbMan, groff);
 }
 
 GQuark
-pdb_groff_error_quark (void)
+pdb_man_error_quark (void)
 {
-  return g_quark_from_static_string ("pdb-groff-error-quark");
+  return g_quark_from_static_string ("pdb-man-error-quark");
 }

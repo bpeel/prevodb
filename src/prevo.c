@@ -26,7 +26,7 @@
 #include "pdb-revo.h"
 #include "pdb-db.h"
 #include "pdb-file.h"
-#include "pdb-groff.h"
+#include "pdb-man.h"
 
 #define PREVO_ERROR (prevo_error_quark ())
 
@@ -719,7 +719,7 @@ show_article (PdbFile *file,
   guint32 article_offset;
   guint32 article_size;
   size_t article_end;
-  PdbGroff *groff = NULL;
+  PdbMan *groff = NULL;
   FILE *out;
   gboolean ret = TRUE;
 
@@ -749,12 +749,12 @@ show_article (PdbFile *file,
     out = stdout;
   else
     {
-      groff = pdb_groff_new (error);
+      groff = pdb_man_new (error);
 
       if (groff == NULL)
         return FALSE;
 
-      out = pdb_groff_get_output (groff);
+      out = pdb_man_get_output (groff);
     }
 
   fputs (".TH ", out);
@@ -787,12 +787,12 @@ show_article (PdbFile *file,
 
   if (ret && groff)
     {
-      if (!pdb_groff_display (groff, error))
+      if (!pdb_man_display (groff, error))
         ret = FALSE;
     }
 
   if (groff)
-    pdb_groff_free (groff);
+    pdb_man_free (groff);
 
   return ret;
 }
