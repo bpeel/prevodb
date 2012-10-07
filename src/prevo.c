@@ -43,8 +43,9 @@ typedef enum
 static const char prevo_magic[4] = "PRDB";
 
 static const char *option_db_file = NULL;
-static const char *option_arg0 = NULL;
-static const char *option_arg1 = NULL;
+static const char *option_language = NULL;
+static const char *option_word = NULL;
+static gboolean option_raw = FALSE;
 static gboolean option_complete = FALSE;
 
 static GOptionEntry
@@ -56,7 +57,7 @@ options[] =
     },
     {
       "complete", 'c', 0, G_OPTION_ARG_NONE, &option_complete,
-      "Show completions for the word or language instead of an article", NULL
+      "Show completions for the word instead of an article", NULL
     },
     { NULL, 0, 0, 0, NULL, NULL, NULL }
   };
@@ -96,13 +97,13 @@ process_arguments (int *argc, char ***argv,
         }
       else if (*argc == 2)
         {
-          option_arg0 = (* argv)[1];
-          option_arg1 = NULL;
+          option_language = "eo";
+          option_word = (* argv)[1];
         }
       else if (*argc == 3)
         {
-          option_arg0 = (* argv)[1];
-          option_arg1 = (* argv)[2];
+          option_language = (* argv)[1];
+          option_word = (* argv)[2];
         }
       else
         {
@@ -318,54 +319,6 @@ map_language_trie (PdbFile *file,
                      file->pos - sizeof (guint32),
                      map_data,
                      error);
-}
-
-static gboolean
-complete_language (PdbFile *file,
-                   const char *language,
-                   GError **error)
-{
-  guint32 n_languages;
-  const guint8 *language_table;
-  MapData map_data;
-  int search_index;
-  gboolean ret = TRUE;
-
-  if (!map_language_table (file, &n_languages, &map_data, error))
-    return FALSE;
-
-  language_table = map_data.data_ptr;
-
-  search_index = search_language_table (language_table, n_languages, language);
-
-  if (search_index != -1)
-    {
-      while (search_index < n_languages)
-        {
-          const guint8 *pos = (language_table +
-                               search_index++ * LANGUAGE_ENTRY_SIZE);
-
-          if (!memchr (pos, '\0', MAX_LANGUAGE_CODE_SIZE + 1))
-            {
-              g_set_error (error,
-                           PREVO_ERROR,
-                           PREVO_ERROR_INVALID_FORMAT,
-                           "%s: A language code is missing the null terminator",
-                           file->filename);
-              ret = FALSE;
-              break;
-            }
-
-          if (!g_str_has_prefix ((const char *) pos, language))
-            break;
-
-          printf ("%s\n", pos);
-        }
-    }
-
-  unmap_region (&map_data);
-
-  return ret;
 }
 
 static guint32
@@ -825,20 +778,6 @@ process_file (const char *db_filename,
 
       if (pdb_file_read (&file, magic, sizeof (magic), error))
         {
-          const char *language;
-          const char *word;
-
-          if (option_arg1)
-            {
-              language = option_arg0;
-              word = option_arg1;
-            }
-          else
-            {
-              language = "eo";
-              word = option_arg0;
-            }
-
           if (memcmp (magic, prevo_magic, sizeof (magic)))
             {
               g_set_error (error,
@@ -850,18 +789,13 @@ process_file (const char *db_filename,
             }
           else if (option_complete)
             {
-              if (option_arg1)
-                {
-                  if (!complete_word (&file,
-                                      language,
-                                      word,
-                                      error))
-                    ret = FALSE;
-                }
-              else if (!complete_language (&file, option_arg0, error))
+              if (!complete_word (&file,
+                                  option_language,
+                                  option_word,
+                                  error))
                 ret = FALSE;
             }
-          else if (!search_article (&file, language, word, error))
+          else if (!search_article (&file, option_language, option_word, error))
             ret = FALSE;
         }
       else
