@@ -649,6 +649,67 @@ show_spanned_string (PdbFile *file,
 }
 
 static gboolean
+show_spanned_string_argument (PdbFile *file,
+                              FILE *out,
+                              GError **error)
+{
+  guint16 string_len;
+  size_t to_read;
+  char buf[128];
+  const char *p;
+
+  if (!pdb_file_read_16 (file, &string_len, error))
+    return FALSE;
+
+  fputc ('"', out);
+
+  while (string_len > 0)
+    {
+      to_read = MIN (string_len, sizeof (buf));
+
+      if (!pdb_file_read (file, buf, to_read, error))
+        return FALSE;
+
+      for (p = buf; p - buf < to_read; p++)
+        switch (*p)
+          {
+          case '"':
+            fputs ("\\\"", out);
+            break;
+
+          case '\\':
+            fputs ("\\\\", out);
+            break;
+
+          case '\n':
+            fputc (' ', out);
+
+          default:
+            fputc (*p, out);
+            break;
+          }
+
+      string_len -= to_read;
+    }
+
+  fputc ('"', out);
+
+  while (TRUE)
+    {
+      guint16 span_length;
+
+      if (!pdb_file_read_16 (file, &span_length, error))
+        return FALSE;
+
+      if (span_length == 0)
+        return TRUE;
+
+      if (!pdb_file_seek (file, sizeof (guint16) * 3 + 1, SEEK_CUR, error))
+        return FALSE;
+    }
+}
+
+static gboolean
 show_article (PdbFile *file,
               int article_num,
               int mark_num,
@@ -696,14 +757,33 @@ show_article (PdbFile *file,
       out = pdb_groff_get_output (groff);
     }
 
-  while (file->pos < article_end)
-    if (show_spanned_string (file, out, error))
-      fputs ("\n\n", out);
-    else
-      {
-        ret = FALSE;
-        break;
-      }
+  fputs (".TH ", out);
+
+  if (!show_spanned_string_argument (file, out, error))
+    ret = FALSE;
+  else
+    {
+      int string_num = 0;
+
+      fputs (" 7\n\n", out);
+
+      while (file->pos < article_end)
+        {
+          if ((string_num & 1) == 0)
+            fputs (".SH\n", out);
+
+          if (show_spanned_string (file, out, error))
+            fputs ("\n\n", out);
+          else
+            {
+              ret = FALSE;
+              break;
+            }
+
+
+          string_num++;
+        }
+    }
 
   if (ret && groff)
     {
