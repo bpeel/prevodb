@@ -27,6 +27,7 @@
 #include "pdb-db.h"
 #include "pdb-file.h"
 #include "pdb-man.h"
+#include "pdb-span.h"
 
 #define PREVO_ERROR (prevo_error_quark ())
 
@@ -627,14 +628,242 @@ complete_word (PdbFile *file,
   return TRUE;
 }
 
+static void
+insert_span_start (PdbList *spans,
+                   PdbSpan *span)
+{
+  PdbSpan *insert_pos;
+
+  pdb_list_for_each (insert_pos, spans, link)
+    if (insert_pos->span_start >= span->span_start)
+      {
+        pdb_list_insert (insert_pos->link.prev, &span->link);
+        return;
+      }
+
+  pdb_list_insert (spans->prev, &span->link);
+}
+
+static void
+insert_span_end (PdbList *spans,
+                 PdbSpan *span)
+{
+  PdbSpan *insert_pos;
+
+  pdb_list_for_each (insert_pos, spans, link)
+    if (insert_pos->span_start + insert_pos->span_length >=
+        span->span_start + span->span_length)
+      {
+        pdb_list_insert (insert_pos->link.prev, &span->link);
+        return;
+      }
+
+  pdb_list_insert (spans->prev, &span->link);
+}
+
+static gboolean
+get_spans (PdbFile *file,
+           PdbList *result,
+           GError **error)
+{
+  pdb_list_init (result);
+
+  while (TRUE)
+    {
+      guint16 span_length;
+      PdbSpan *span;
+      guint8 type;
+
+      if (!pdb_file_read_16 (file, &span_length, error))
+        break;
+
+      if (span_length == 0)
+        return TRUE;
+
+      span = g_slice_new (PdbSpan);
+
+      if (!pdb_file_read_16 (file, &span->span_start, error) ||
+          !pdb_file_read_16 (file, &span->data1, error) ||
+          !pdb_file_read_16 (file, &span->data2, error) ||
+          !pdb_file_read_8 (file, &type, error))
+        {
+          g_slice_free (PdbSpan, span);
+          break;
+        }
+
+      insert_span_start (result, span);
+
+      span->span_length = span_length;
+      span->type = type;
+    }
+
+  pdb_span_free_list (result);
+
+  return FALSE;
+}
+
+typedef enum
+{
+  WRITE_STATE_START_PARAGRAPH,
+  WRITE_STATE_START_LINE,
+  WRITE_STATE_IN_BOLD,
+  WRITE_STATE_IN_SUPERSCRIPT,
+  WRITE_STATE_IN_ITALIC,
+  WRITE_STATE_IN_TEXT
+} WriteState;
+
+typedef struct
+{
+  FILE *out;
+  WriteState state;
+  WriteState next_state;
+  int bold_count;
+  int superscript_count;
+  int italic_count;
+  int indent_count;
+} WriteData;
+
+static void
+update_next_state (WriteData *write_data)
+{
+  if (write_data->bold_count > 0)
+    write_data->next_state = WRITE_STATE_IN_BOLD;
+  else if (write_data->italic_count > 0)
+    write_data->next_state = WRITE_STATE_IN_ITALIC;
+  else if (write_data->superscript_count > 0)
+    write_data->next_state = WRITE_STATE_IN_SUPERSCRIPT;
+  else
+    write_data->next_state = WRITE_STATE_IN_TEXT;
+}
+
+static void
+handle_start_span (WriteData *write_data,
+                   PdbSpan *span)
+{
+  switch (span->type)
+    {
+    case PDB_SPAN_BOLD:
+    case PDB_SPAN_REFERENCE:
+      write_data->bold_count++;
+      break;
+    case PDB_SPAN_SUPERSCRIPT:
+      write_data->superscript_count++;
+      break;
+    case PDB_SPAN_ITALIC:
+      write_data->italic_count++;
+      break;
+    case PDB_SPAN_NOTE:
+      write_data->indent_count++;
+      break;
+    case PDB_SPAN_NONE:
+      return;
+    }
+
+  update_next_state (write_data);
+}
+
+static void
+handle_end_span (WriteData *write_data,
+                 PdbSpan *span)
+{
+  switch (span->type)
+    {
+    case PDB_SPAN_BOLD:
+    case PDB_SPAN_REFERENCE:
+      write_data->bold_count--;
+      break;
+    case PDB_SPAN_SUPERSCRIPT:
+      write_data->superscript_count--;
+      break;
+    case PDB_SPAN_ITALIC:
+      write_data->italic_count--;
+      break;
+    case PDB_SPAN_NOTE:
+      write_data->indent_count--;
+      break;
+    case PDB_SPAN_NONE:
+      return;
+    }
+
+  update_next_state (write_data);
+}
+
+static void
+write_string (WriteData *write_data,
+              const char *str,
+              int length)
+{
+  while (length > 0)
+    {
+      if (*str == '\n')
+        {
+          if (write_data->state == WRITE_STATE_START_LINE)
+            write_data->state = WRITE_STATE_START_PARAGRAPH;
+          else if (write_data->state != WRITE_STATE_START_PARAGRAPH)
+            write_data->state = WRITE_STATE_START_LINE;
+
+          fputc ('\n', write_data->out);
+        }
+      else if ((write_data->state != WRITE_STATE_START_LINE &&
+                write_data->state != WRITE_STATE_START_PARAGRAPH) ||
+               !g_ascii_isspace (*str))
+        {
+          if (write_data->state == WRITE_STATE_START_PARAGRAPH &&
+              write_data->indent_count)
+            fputs (".IP\n", write_data->out);
+
+          if (write_data->state != write_data->next_state)
+            {
+              if (write_data->state != WRITE_STATE_START_PARAGRAPH &&
+                  write_data->state != WRITE_STATE_START_LINE)
+                {
+                  write_data->state = WRITE_STATE_START_LINE;
+                  fputc ('\n', write_data->out);
+                  continue;
+                }
+
+              switch (write_data->next_state)
+                {
+                case WRITE_STATE_IN_BOLD:
+                  fputs (".B\n", write_data->out);
+                  break;
+                case WRITE_STATE_IN_SUPERSCRIPT:
+                  fputs (".SM\n", write_data->out);
+                  break;
+                case WRITE_STATE_IN_ITALIC:
+                  fputs (".I\n", write_data->out);
+                  break;
+                case WRITE_STATE_IN_TEXT:
+                  break;
+                case WRITE_STATE_START_PARAGRAPH:
+                case WRITE_STATE_START_LINE:
+                  g_assert_not_reached ();
+                }
+
+              write_data->state = write_data->next_state;
+            }
+
+          if (*str == '.' || *str == '\\')
+            fputc ('\\', write_data->out);
+
+          fputc (*str, write_data->out);
+        }
+
+      str++;
+      length--;
+    }
+}
+
 static gboolean
 show_spanned_string (PdbFile *file,
-                     FILE *out,
+                     WriteData *write_data,
                      GError **error)
 {
   char *string_data;
   guint16 string_len;
-  guint16 span_length;
+  PdbList span_starts, span_ends;
+  gboolean ret = TRUE;
+  int last_pos = 0;
 
   if (!pdb_file_read_16 (file, &string_len, error))
     return FALSE;
@@ -644,24 +873,85 @@ show_spanned_string (PdbFile *file,
   if (!pdb_file_read (file, string_data, string_len, error))
     return FALSE;
 
-  fwrite (string_data, 1, string_len, out);
+  if (!get_spans (file, &span_starts, error))
+    return FALSE;
+
+  pdb_list_init (&span_ends);
 
   while (TRUE)
     {
-      if (!pdb_file_read_16 (file, &span_length, error))
-        return FALSE;
+      PdbSpan *span = NULL;
+      gboolean is_start = TRUE;
 
-      if (span_length == 0)
-        return TRUE;
+      if (!pdb_list_empty (&span_starts))
+        span = pdb_container_of (span_starts.next, span, link);
 
-      if (!pdb_file_seek (file, sizeof (guint16) * 3 + 1, SEEK_CUR, error))
-        return FALSE;
+      if (!pdb_list_empty (&span_ends))
+        {
+          PdbSpan *end_span = pdb_container_of (span_ends.next, span, link);
+
+          if (span == NULL ||
+              end_span->span_start + end_span->span_length <= span->span_start)
+            {
+              span = end_span;
+              is_start = FALSE;
+            }
+        }
+
+      if (span == NULL)
+        {
+          write_string (write_data,
+                        string_data + last_pos,
+                        string_len - last_pos);
+          break;
+        }
+
+      if (is_start)
+        {
+          if (span->span_start + span->span_length > string_len)
+            {
+              g_set_error (error,
+                           PREVO_ERROR,
+                           PREVO_ERROR_INVALID_FORMAT,
+                           "%s: Invalid span",
+                           file->filename);
+              ret = FALSE;
+              break;
+            }
+
+          write_string (write_data,
+                        string_data + last_pos,
+                        span->span_start - last_pos);
+          last_pos = span->span_start;
+
+          handle_start_span (write_data, span);
+
+          pdb_list_remove (&span->link);
+          insert_span_end (&span_ends, span);
+        }
+      else
+        {
+          write_string (write_data,
+                        string_data + last_pos,
+                        span->span_start + span->span_length - last_pos);
+          last_pos = span->span_start + span->span_length;
+
+          handle_end_span (write_data, span);
+
+          pdb_list_remove (&span->link);
+          g_slice_free (PdbSpan, span);
+        }
     }
+
+  pdb_span_free_list (&span_starts);
+  pdb_span_free_list (&span_ends);
+
+  return ret;
 }
 
 static gboolean
 show_spanned_string_argument (PdbFile *file,
-                              FILE *out,
+                              WriteData *write_data,
                               GError **error)
 {
   guint16 string_len;
@@ -672,7 +962,7 @@ show_spanned_string_argument (PdbFile *file,
   if (!pdb_file_read_16 (file, &string_len, error))
     return FALSE;
 
-  fputc ('"', out);
+  fputc ('"', write_data->out);
 
   while (string_len > 0)
     {
@@ -685,25 +975,25 @@ show_spanned_string_argument (PdbFile *file,
         switch (*p)
           {
           case '"':
-            fputs ("\\\"", out);
+            fputs ("\\\"", write_data->out);
             break;
 
           case '\\':
-            fputs ("\\\\", out);
+            fputs ("\\\\", write_data->out);
             break;
 
           case '\n':
-            fputc (' ', out);
+            fputc (' ', write_data->out);
 
           default:
-            fputc (*p, out);
+            fputc (*p, write_data->out);
             break;
           }
 
       string_len -= to_read;
     }
 
-  fputc ('"', out);
+  fputc ('"', write_data->out);
 
   while (TRUE)
     {
@@ -720,6 +1010,26 @@ show_spanned_string_argument (PdbFile *file,
     }
 }
 
+static void
+start_paragraph (WriteData *write_data)
+{
+  switch (write_data->state)
+    {
+    case WRITE_STATE_START_PARAGRAPH:
+      break;
+
+    case WRITE_STATE_START_LINE:
+      fputc ('\n', write_data->out);
+      break;
+
+    default:
+      fputs ("\n\n", write_data->out);
+      break;
+    }
+
+  write_data->state = WRITE_STATE_START_PARAGRAPH;
+}
+
 static gboolean
 show_article (PdbFile *file,
               int article_num,
@@ -731,7 +1041,7 @@ show_article (PdbFile *file,
   guint32 article_size;
   size_t article_end;
   PdbMan *groff = NULL;
-  FILE *out;
+  WriteData write_data;
   gboolean ret = TRUE;
 
   if (!pdb_file_seek (file, 4, SEEK_SET, error) ||
@@ -756,8 +1066,12 @@ show_article (PdbFile *file,
 
   article_end = file->pos + article_size;
 
+  memset (&write_data, 0, sizeof (write_data));
+  write_data.state = WRITE_STATE_START_PARAGRAPH;
+  update_next_state (&write_data);
+
   if (option_raw)
-    out = stdout;
+    write_data.out = stdout;
   else
     {
       groff = pdb_man_new (error);
@@ -765,32 +1079,45 @@ show_article (PdbFile *file,
       if (groff == NULL)
         return FALSE;
 
-      out = pdb_man_get_output (groff);
+      write_data.out = pdb_man_get_output (groff);
     }
 
-  fputs (".TH ", out);
+  fputs (".TH ", write_data.out);
 
-  if (!show_spanned_string_argument (file, out, error))
+  if (!show_spanned_string_argument (file, &write_data, error))
     ret = FALSE;
   else
     {
       int string_num = 0;
 
-      fputs (" 7\n\n", out);
+      fputs (" 7\n\n", write_data.out);
 
       while (file->pos < article_end)
         {
           if ((string_num & 1) == 0)
-            fputs (".SH\n", out);
+            {
+              start_paragraph (&write_data);
 
-          if (show_spanned_string (file, out, error))
-            fputs ("\n\n", out);
+              fputs (".SH ", write_data.out);
+
+              if (!show_spanned_string_argument (file, &write_data, error))
+                {
+                  ret = FALSE;
+                  break;
+                }
+
+              fputs ("\n\n", write_data.out);
+            }
           else
             {
-              ret = FALSE;
-              break;
-            }
 
+              start_paragraph (&write_data);
+              if (!show_spanned_string (file, &write_data, error))
+                {
+                  ret = FALSE;
+                  break;
+                }
+            }
 
           string_num++;
         }

@@ -44,8 +44,12 @@ prevodb_LDADD = \
 prevo_SOURCES = \
 	pdb-file.c \
 	pdb-file.h \
+	pdb-list.c \
+	pdb-list.h \
 	pdb-man.c \
 	pdb-man.h \
+	pdb-span.c \
+	pdb-span.h \
 	prevo.c
 
 prevo_LDADD = \
