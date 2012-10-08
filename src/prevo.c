@@ -596,8 +596,61 @@ static char *
 get_search_term (const char *language,
                  const char *word)
 {
-  /* FIXME: Make this handle x-notation when the language is "eo" */
-  return g_utf8_strdown (word, -1);
+  if (strcmp (language, "eo"))
+    return g_utf8_strdown (word, -1);
+  else
+    {
+      GString *buf = g_string_new (NULL);
+
+      while (*word)
+        {
+          const char *next = g_utf8_next_char (word);
+          gunichar ch = g_utf8_get_char (word);
+
+          if (*next == 'x' || *next == 'X')
+            {
+              switch (ch)
+                {
+                case 'c':
+                case 'C':
+                  g_string_append (buf, "ĉ");
+                  break;
+                case 'g':
+                case 'G':
+                  g_string_append (buf, "ĝ");
+                  break;
+                case 'h':
+                case 'H':
+                  g_string_append (buf, "ĥ");
+                  break;
+                case 'j':
+                case 'J':
+                  g_string_append (buf, "ĵ");
+                  break;
+                case 's':
+                case 'S':
+                  g_string_append (buf, "ŝ");
+                  break;
+                case 'u':
+                case 'U':
+                  g_string_append (buf, "ŭ");
+                  break;
+                default:
+                  goto normal_character;
+                }
+
+              word = g_utf8_next_char (next);
+              continue;
+            }
+
+        normal_character:
+          g_string_append_unichar (buf, g_unichar_tolower (ch));
+
+          word = next;
+        }
+
+      return g_string_free (buf, FALSE);
+    }
 }
 
 static gboolean
@@ -1146,6 +1199,7 @@ search_article (PdbFile *file,
   char *search_term;
   int article_num = -1;
   int mark_num = -1;
+  gboolean ret;
 
   if (!map_language_trie (file, language, &map_data, error))
     return FALSE;
@@ -1176,21 +1230,23 @@ search_article (PdbFile *file,
         }
     }
 
-  g_free (search_term);
-
   unmap_region (&map_data);
 
   if (article_num != -1)
-    return show_article (file, article_num, mark_num, error);
+    ret = show_article (file, article_num, mark_num, error);
   else
     {
       g_set_error (error,
                    PREVO_ERROR,
                    PREVO_ERROR_NO_SUCH_ARTICLE,
                    "No article found for “%s”",
-                   word);
-      return FALSE;
+                   search_term);
+      ret = FALSE;
     }
+
+  g_free (search_term);
+
+  return ret;
 }
 
 static gboolean
