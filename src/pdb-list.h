@@ -26,9 +26,15 @@
 #ifndef PDB_LIST_H
 #define PDB_LIST_H
 
-#define container_of(ptr, type, member) ({                      \
-      const __typeof__( ((type *)0)->member ) *__mptr = (ptr);  \
-      (type *)( (char *)__mptr - offsetof(type,member) );})
+#ifdef __GNUC__
+#define pdb_container_of(ptr, sample, member)                           \
+  (__typeof__(sample))((char *)(ptr)    -                               \
+                       ((char *)&(sample)->member - (char *)(sample)))
+#else
+#define pdb_container_of(ptr, sample, member)                   \
+  (void *)((char *)(ptr)        -                               \
+           ((char *)&(sample)->member - (char *)(sample)))
+#endif
 
 /**
  * PdbList - linked list
@@ -88,32 +94,22 @@ void
 pdb_list_insert_list (PdbList *list,
                       PdbList *other);
 
-#ifdef __GNUC__
-#define __wl_container_of(ptr, sample, member)                          \
-  (__typeof__(sample))((char *)(ptr)    -                               \
-                       ((char *)&(sample)->member - (char *)(sample)))
-#else
-#define __wl_container_of(ptr, sample, member)                  \
-  (void *)((char *)(ptr)        -                               \
-           ((char *)&(sample)->member - (char *)(sample)))
-#endif
-
 #define pdb_list_for_each(pos, head, member)                            \
-  for (pos = 0, pos = __wl_container_of((head)->next, pos, member);     \
+  for (pos = 0, pos = pdb_container_of((head)->next, pos, member);      \
        &pos->member != (head);                                          \
-       pos = __wl_container_of(pos->member.next, pos, member))
+       pos = pdb_container_of(pos->member.next, pos, member))
 
 #define pdb_list_for_each_safe(pos, tmp, head, member)                  \
   for (pos = 0, tmp = 0,                                                \
-         pos = __wl_container_of((head)->next, pos, member),            \
-         tmp = __wl_container_of((pos)->member.next, tmp, member);      \
+         pos = pdb_container_of((head)->next, pos, member),             \
+         tmp = pdb_container_of((pos)->member.next, tmp, member);       \
        &pos->member != (head);                                          \
        pos = tmp,                                                       \
-         tmp = __wl_container_of(pos->member.next, tmp, member))
+         tmp = pdb_container_of(pos->member.next, tmp, member))
 
 #define pdb_list_for_each_reverse(pos, head, member)                    \
-  for (pos = 0, pos = __wl_container_of((head)->prev, pos, member);     \
+  for (pos = 0, pos = pdb_container_of((head)->prev, pos, member);      \
        &pos->member != (head);                                          \
-       pos = __wl_container_of(pos->member.prev, pos, member))
+       pos = pdb_container_of(pos->member.prev, pos, member))
 
 #endif /* PDB_LIST_H */
