@@ -32,6 +32,7 @@
 #include "pdb-roman.h"
 #include "pdb-list.h"
 #include "pdb-file.h"
+#include "pdb-span.h"
 
 /* The article file format is a list of strings. Each string comprises of:
  * • A two byte little endian number for the length of the string data
@@ -82,36 +83,12 @@
 
 static const char pdb_db_magic[4] = "PRDB";
 
-typedef enum
-{
-  PDB_DB_SPAN_REFERENCE,
-  PDB_DB_SPAN_SUPERSCRIPT,
-  PDB_DB_SPAN_ITALIC,
-  PDB_DB_SPAN_NOTE,
-  PDB_DB_SPAN_BOLD,
-  PDB_DB_SPAN_NONE
-} PdbDbSpanType;
-
-typedef struct
-{
-  PdbList link;
-
-  /* The span length and span start count the number of bytes. Once
-   * stored to the file, this will be converted to a number of 16-bit
-   * units as if the string was stored in UTF-16. */
-  guint16 span_length;
-  guint16 span_start;
-  guint16 data1;
-  guint16 data2;
-  PdbDbSpanType type;
-} PdbDbSpan;
-
 typedef struct
 {
   int length;
   char *text;
 
-  /* A list of PdbDbSpans */
+  /* A list of PdbSpans */
   PdbList spans;
 } PdbDbSpannableString;
 
@@ -165,7 +142,7 @@ typedef struct
  * can be resolved later once all of the articles are loaded */
 typedef struct
 {
-  PdbDbSpan *span;
+  PdbSpan *span;
   PdbDbReference *reference;
 } PdbDbLink;
 
@@ -388,25 +365,10 @@ pdb_db_mark_free (PdbDbMark *mark)
 }
 
 static void
-pdb_db_span_free (PdbDbSpan *span)
-{
-  g_slice_free (PdbDbSpan, span);
-}
-
-static void
-pdb_db_free_span_list (PdbList *spans)
-{
-  PdbDbSpan *span, *tmp;
-
-  pdb_list_for_each_safe (span, tmp, spans, link)
-    pdb_db_span_free (span);
-}
-
-static void
 pdb_db_destroy_spannable_string (PdbDbSpannableString *string)
 {
   g_free (string->text);
-  pdb_db_free_span_list (&string->spans);
+  pdb_span_free_list (&string->spans);
 }
 
 static void
@@ -485,7 +447,7 @@ pdb_db_free_translation_data_cb (void *user_data)
   if (data->buf)
     g_string_free (data->buf, TRUE);
 
-  pdb_db_free_span_list (&data->spans);
+  pdb_span_free_list (&data->spans);
 
   g_slice_free (PdbDbTranslationData, data);
 }
@@ -523,7 +485,7 @@ pdb_db_get_trd_link (PdbDb *db,
   PdbDocNode *n;
   int sence_num = -1;
   int subsence_num = -1;
-  PdbDbSpan *span;
+  PdbSpan *span;
   PdbDbLink *link;
   int span_start, span_end;
 
@@ -619,10 +581,10 @@ pdb_db_get_trd_link (PdbDb *db,
 
   span_end = buf->len;
 
-  span = g_slice_new0 (PdbDbSpan);
+  span = g_slice_new0 (PdbSpan);
   span->span_length = span_end - span_start;
   span->span_start = span_start;
-  span->type = PDB_DB_SPAN_REFERENCE;
+  span->type = PDB_SPAN_REFERENCE;
   /* Add this span to the end of the list */
   pdb_list_insert (spans->prev, &span->link);
 
@@ -1096,7 +1058,7 @@ pdb_db_resolve_links (PdbDb *db)
            * that it won't leave a link pointing to the wrong
            * article */
           pdb_list_remove (&link->span->link);
-          pdb_db_span_free (link->span);
+          pdb_span_free (link->span);
         }
     }
 }
@@ -1116,7 +1078,7 @@ typedef struct
   union
   {
     PdbDocNode *node;
-    PdbDbSpan *span;
+    PdbSpan *span;
     gunichar character;
   } d;
 } PdbDbParseStackEntry;
@@ -1179,13 +1141,13 @@ pdb_db_parse_push_closing_character (PdbDbParseState *state,
 typedef gboolean (* PdbDbElementHandler) (PdbDb *db,
                                           PdbDbParseState *state,
                                           PdbDocElementNode *element,
-                                          PdbDbSpan *span,
+                                          PdbSpan *span,
                                           GError **error);
 
 typedef struct
 {
   const char *name;
-  PdbDbSpanType type;
+  PdbSpanType type;
   PdbDbElementHandler handler;
   gboolean paragraph;
 } PdbDbElementSpan;
@@ -1201,11 +1163,11 @@ pdb_db_start_text (PdbDbParseState *state)
     }
 }
 
-static PdbDbSpan *
+static PdbSpan *
 pdb_db_start_span (PdbDbParseState *state,
-                   PdbDbSpanType type)
+                   PdbSpanType type)
 {
-  PdbDbSpan *span = g_slice_new0 (PdbDbSpan);
+  PdbSpan *span = g_slice_new0 (PdbSpan);
   PdbDbParseStackEntry *entry;
 
   span->span_start = state->buf->len;
@@ -1226,7 +1188,7 @@ static gboolean
 pdb_db_handle_aut (PdbDb *db,
                    PdbDbParseState *state,
                    PdbDocElementNode *element,
-                   PdbDbSpan *span,
+                   PdbSpan *span,
                    GError **error)
 {
   pdb_db_start_text (state);
@@ -1240,14 +1202,14 @@ static gboolean
 pdb_db_handle_rim (PdbDb *db,
                    PdbDbParseState *state,
                    PdbDocElementNode *element,
-                   PdbDbSpan *span,
+                   PdbSpan *span,
                    GError **error)
 {
-  PdbDbSpan *bold_span = g_slice_new0 (PdbDbSpan);
+  PdbSpan *bold_span = g_slice_new0 (PdbSpan);
 
   pdb_db_start_text (state);
 
-  bold_span->type = PDB_DB_SPAN_BOLD;
+  bold_span->type = PDB_SPAN_BOLD;
   bold_span->span_start = state->buf->len;
 
   g_string_append (state->buf, "Rim. ");
@@ -1335,7 +1297,7 @@ static gboolean
 pdb_db_handle_ref (PdbDb *db,
                    PdbDbParseState *state,
                    PdbDocElementNode *element,
-                   PdbDbSpan *span,
+                   PdbSpan *span,
                    GError **error)
 {
   PdbDbReference *reference;
@@ -1356,7 +1318,7 @@ pdb_db_handle_ref (PdbDb *db,
 
   pdb_db_handle_reference_type (state, element);
 
-  span = pdb_db_start_span (state, PDB_DB_SPAN_REFERENCE);
+  span = pdb_db_start_span (state, PDB_SPAN_REFERENCE);
 
   link = g_slice_new (PdbDbLink);
   link->span = span;
@@ -1375,7 +1337,7 @@ static gboolean
 pdb_db_handle_refgrp (PdbDb *db,
                       PdbDbParseState *state,
                       PdbDocElementNode *element,
-                      PdbDbSpan *span,
+                      PdbSpan *span,
                       GError **error)
 {
   pdb_db_handle_reference_type (state, element);
@@ -1387,7 +1349,7 @@ static gboolean
 pdb_db_handle_subdrv (PdbDb *db,
                       PdbDbParseState *state,
                       PdbDocElementNode *element,
-                      PdbDbSpan *span,
+                      PdbSpan *span,
                       GError **error)
 {
   int sence_num;
@@ -1408,7 +1370,7 @@ static gboolean
 pdb_db_handle_snc (PdbDb *db,
                    PdbDbParseState *state,
                    PdbDocElementNode *element,
-                   PdbDbSpan *span,
+                   PdbSpan *span,
                    GError **error)
 {
   int sence_num;
@@ -1429,7 +1391,7 @@ static gboolean
 pdb_db_handle_subsnc (PdbDb *db,
                       PdbDbParseState *state,
                       PdbDocElementNode *element,
-                      PdbDbSpan *span,
+                      PdbSpan *span,
                       GError **error)
 {
   int sence_num;
@@ -1450,7 +1412,7 @@ static gboolean
 pdb_db_handle_uzo (PdbDb *db,
                    PdbDbParseState *state,
                    PdbDocElementNode *element,
-                   PdbDbSpan *span,
+                   PdbSpan *span,
                    GError **error)
 {
   char **att;
@@ -1476,45 +1438,45 @@ pdb_db_handle_uzo (PdbDb *db,
 static PdbDbElementSpan
 pdb_db_element_spans[] =
   {
-    { .name = "ofc", .type = PDB_DB_SPAN_SUPERSCRIPT },
-    { .name = "ekz", .type = PDB_DB_SPAN_ITALIC },
+    { .name = "ofc", .type = PDB_SPAN_SUPERSCRIPT },
+    { .name = "ekz", .type = PDB_SPAN_ITALIC },
     {
       .name = "subdrv",
-      .type = PDB_DB_SPAN_NONE,
+      .type = PDB_SPAN_NONE,
       .handler = pdb_db_handle_subdrv,
       .paragraph = TRUE
     },
     {
       .name = "snc",
-      .type = PDB_DB_SPAN_NONE,
+      .type = PDB_SPAN_NONE,
       .handler = pdb_db_handle_snc,
       .paragraph = TRUE
     },
     {
       .name = "subsnc",
-      .type = PDB_DB_SPAN_NONE,
+      .type = PDB_SPAN_NONE,
       .handler = pdb_db_handle_subsnc,
       .paragraph = TRUE
     },
     {
       .name = "ref",
-      .type = PDB_DB_SPAN_NONE,
+      .type = PDB_SPAN_NONE,
       .handler = pdb_db_handle_ref
     },
     {
       .name = "refgrp",
-      .type = PDB_DB_SPAN_NONE,
+      .type = PDB_SPAN_NONE,
       .handler = pdb_db_handle_refgrp
     },
     {
       .name = "rim",
-      .type = PDB_DB_SPAN_NOTE,
+      .type = PDB_SPAN_NOTE,
       .handler = pdb_db_handle_rim,
       .paragraph = TRUE
     },
-    { .name = "em", .type = PDB_DB_SPAN_BOLD, },
-    { .name = "aut", .type = PDB_DB_SPAN_NONE, .handler = pdb_db_handle_aut },
-    { .name = "uzo", .type = PDB_DB_SPAN_NONE, .handler = pdb_db_handle_uzo }
+    { .name = "em", .type = PDB_SPAN_BOLD, },
+    { .name = "aut", .type = PDB_SPAN_NONE, .handler = pdb_db_handle_aut },
+    { .name = "uzo", .type = PDB_SPAN_NONE, .handler = pdb_db_handle_uzo }
   };
 
 static gboolean
@@ -1590,7 +1552,7 @@ pdb_db_parse_node (PdbDb *db,
 
                 if (!strcmp (elem_span->name, element->name))
                   {
-                    PdbDbSpan *span;
+                    PdbSpan *span;
 
                     if (elem_span->paragraph)
                       {
@@ -1600,7 +1562,7 @@ pdb_db_parse_node (PdbDb *db,
                         pdb_db_parse_push_add_paragraph (state);
                       }
 
-                    if (elem_span->type == PDB_DB_SPAN_NONE)
+                    if (elem_span->type == PDB_SPAN_NONE)
                       span = NULL;
                     else
                       {
@@ -1714,7 +1676,7 @@ pdb_db_parse_spannable_string (PdbDb *db,
  error:
   g_array_free (state.stack, TRUE);
   g_string_free (state.buf, TRUE);
-  pdb_db_free_span_list (&state.spans);
+  pdb_span_free_list (&state.spans);
 
   return FALSE;
 }
@@ -2409,7 +2371,7 @@ pdb_db_write_string (PdbDb *pdb,
                      PdbFile *out,
                      GError **error)
 {
-  PdbDbSpan *span;
+  PdbSpan *span;
 
   if (!pdb_file_write_16 (out, string->length, error) ||
       !pdb_file_write (out, string->text, string->length, error))

@@ -26,6 +26,8 @@ prevodb_SOURCES = \
 	pdb-revo.h \
 	pdb-roman.c \
 	pdb-roman.h \
+	pdb-span.c \
+	pdb-span.h \
 	pdb-strcmp.c \
 	pdb-strcmp.h \
 	pdb-trie.c \
