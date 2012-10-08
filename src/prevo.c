@@ -121,25 +121,36 @@ process_arguments (int *argc, char ***argv,
 }
 
 static char *
+find_db_file_in_dir (const char *dir)
+{
+  char *full_name = g_build_filename (dir, "prevo", "prevo.db", NULL);
+
+  if (g_file_test (full_name, G_FILE_TEST_IS_REGULAR))
+    return full_name;
+
+  g_free (full_name);
+
+  return NULL;
+}
+
+static char *
 find_db_file (void)
 {
   const char * const *system_data_dirs;
   const char * const *dir;
+  char *full_name;
 
   if (option_db_file)
     return g_strdup (option_db_file);
 
+  if ((full_name = find_db_file_in_dir (g_get_user_data_dir ())))
+    return full_name;
+
   system_data_dirs = g_get_system_data_dirs ();
 
   for (dir = system_data_dirs; *dir; dir++)
-    {
-      char *full_name = g_build_filename (*dir, "prevo", "prevo.db", NULL);
-
-      if (g_file_test (full_name, G_FILE_TEST_IS_REGULAR))
-        return full_name;
-
-      g_free (full_name);
-    }
+    if ((full_name = find_db_file_in_dir (*dir)))
+      return full_name;
 
   return NULL;
 }
