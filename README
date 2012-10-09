@@ -70,7 +70,7 @@ kompletigoj:
  terpeco       terpinto      terpomfloko   terpoto
  terpeĉo       terpiro       terpomo
 
-Por ebligi tion, oni devas uni inkluzivi unu dosieron en Bash. Tio
+Por ebligi tion, oni devas unue inkluzivi unu dosieron en Bash. Tio
 eblas per:
 
  source src/prevo-completion
