@@ -543,14 +543,17 @@ show_matches (const guint8 *trie_start,
       if ((offset & 0x80000000))
         {
           gboolean has_next;
-
-          fwrite (string_buf->str, 1, string_buf->len, stdout);
-          fputc ('\n', stdout);
+          int match_num = 0;
 
           do
             {
               guint16 article;
               gboolean has_display_name;
+
+              fwrite (string_buf->str, 1, string_buf->len, stdout);
+              if (match_num++ > 0)
+                printf (":%i", match_num);
+              fputc ('\n', stdout);
 
               if (children_start + 3 > search_end)
                 goto done;
@@ -594,10 +597,43 @@ show_matches (const guint8 *trie_start,
 
 static char *
 get_search_term (const char *language,
-                 const char *word)
+                 const char *word,
+                 int *index_num_p)
 {
+  int index_num = 0;
+  int index_pos;
+  char *word_copy = NULL;
+  const char *p;
+  gboolean word_copied;
+  char *ret;
+
+  for (p = word + strlen (word), index_pos = 0;
+       p > word && g_ascii_isdigit (p[-1]);
+       p--, index_pos++)
+    {
+      int i, val = p[-1] - '0';
+
+      for (i = 0; i < index_pos; i++)
+        val *= 10;
+
+      index_num += val;
+    }
+
+  if (p > word && p[-1] == ':')
+    {
+      word_copy = g_memdup (word, p - word);
+      word_copy[p - word - 1] = '\0';
+      word = word_copy;
+      word_copied = TRUE;
+    }
+  else
+    word_copied = FALSE;
+
+  if (index_num_p)
+    *index_num_p = index_num;
+
   if (strcmp (language, "eo"))
-    return g_utf8_strdown (word, -1);
+    ret = g_utf8_strdown (word, -1);
   else
     {
       GString *buf = g_string_new (NULL);
@@ -649,8 +685,13 @@ get_search_term (const char *language,
           word = next;
         }
 
-      return g_string_free (buf, FALSE);
+      ret = g_string_free (buf, FALSE);
     }
+
+  if (word_copied)
+    g_free (word_copy);
+
+  return ret;
 }
 
 static gboolean
@@ -668,7 +709,7 @@ complete_word (PdbFile *file,
 
   trie_start = map_data.data_ptr;
 
-  search_term = get_search_term (language, word);
+  search_term = get_search_term (language, word, NULL);
   trie_start = search_trie (trie_start, search_term);
 
   if (trie_start)
@@ -1198,6 +1239,51 @@ show_article (PdbFile *file,
   return ret;
 }
 
+static void
+extract_article_and_mark (const guint8 *trie_start,
+                          int index_num,
+                          int *article_num_p,
+                          int *mark_num_p)
+{
+  guint32 trie_length = get_uint32 (trie_start);
+
+  if ((trie_length & 0x80000000))
+    {
+      const guint8 *data_start;
+
+      trie_length &= 0x7fffffff;
+
+      if (trie_length < 5 ||
+          (data_start = (const guint8 *) g_utf8_next_char (trie_start + 4)) -
+          trie_start + 3 > trie_length)
+        return;
+
+      while (--index_num > 0)
+        {
+          guint16 article_num = get_uint16 (data_start);
+
+          if ((article_num & 0x8000) == 0)
+            return;
+
+          if ((article_num & 0x4000))
+            {
+              if (data_start + 3 - trie_start >= trie_length)
+                return;
+
+              data_start += 3 + data_start[3] + 1;
+            }
+          else
+            data_start += 3;
+
+          if (data_start - trie_start + 3 > trie_length)
+            return;
+        }
+
+      *article_num_p = get_uint16 (data_start) & 0x3fff;
+      *mark_num_p = data_start[2];
+    }
+}
+
 static gboolean
 search_article (PdbFile *file,
                 const char *language,
@@ -1209,6 +1295,7 @@ search_article (PdbFile *file,
   char *search_term;
   int article_num = -1;
   int mark_num = -1;
+  int index_num;
   gboolean ret;
 
   if (!map_language_trie (file, language, &map_data, error))
@@ -1216,29 +1303,11 @@ search_article (PdbFile *file,
 
   trie_start = map_data.data_ptr;
 
-  search_term = get_search_term (language, word);
+  search_term = get_search_term (language, word, &index_num);
   trie_start = search_trie (trie_start, search_term);
 
   if (trie_start)
-    {
-      guint32 trie_length = get_uint32 (trie_start);
-
-      if ((trie_length & 0x80000000))
-        {
-          const guint8 *data_start;
-
-          trie_length &= 0x7fffffff;
-
-          if (trie_length >= 5 &&
-              (data_start =
-               (const guint8 *) g_utf8_next_char (trie_start + 4)) -
-              trie_start + 3 <= trie_length)
-            {
-              article_num = get_uint16 (data_start) & 0x3fff;
-              mark_num = data_start[2];
-            }
-        }
-    }
+    extract_article_and_mark (trie_start, index_num, &article_num, &mark_num);
 
   unmap_region (&map_data);
 
@@ -1250,7 +1319,7 @@ search_article (PdbFile *file,
                    PREVO_ERROR,
                    PREVO_ERROR_NO_SUCH_ARTICLE,
                    "No article found for “%s”",
-                   search_term);
+                   word);
       ret = FALSE;
     }
 
