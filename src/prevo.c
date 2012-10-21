@@ -1096,6 +1096,10 @@ show_article (PdbFile *file,
   PdbMan *groff = NULL;
   WriteData write_data;
   gboolean ret = TRUE;
+  const char *search_string = NULL;
+
+  if (mark_num > 0)
+    search_string = "<<<";
 
   if (!pdb_file_seek (file, 4, SEEK_SET, error) ||
       !pdb_file_read_32 (file, &n_articles, error))
@@ -1127,7 +1131,7 @@ show_article (PdbFile *file,
     write_data.out = stdout;
   else
     {
-      groff = pdb_man_new (error);
+      groff = pdb_man_new (search_string, error);
 
       if (groff == NULL)
         return FALSE;
@@ -1157,6 +1161,12 @@ show_article (PdbFile *file,
                 {
                   ret = FALSE;
                   break;
+                }
+
+              if (search_string && string_num / 2 == mark_num)
+                {
+                  fputc (' ', write_data.out);
+                  fputs (search_string, write_data.out);
                 }
 
               fputs ("\n\n", write_data.out);

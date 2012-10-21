@@ -53,23 +53,54 @@ kill_process (GPid pid)
 }
 
 PdbMan *
-pdb_man_new (GError **error)
+pdb_man_new (const char *search_string,
+             GError **error)
 {
   GPid pid;
   int stdin_fd;
+  gchar **env = NULL;
+  gboolean spawn_ret;
 
-  if (g_spawn_async_with_pipes (NULL, /* working_dir */
-                                (char **) pdb_man_args,
-                                NULL, /* envp */
-                                G_SPAWN_DO_NOT_REAP_CHILD |
-                                G_SPAWN_SEARCH_PATH,
-                                NULL, /* child_setup_func */
-                                NULL, /* user_data */
-                                &pid,
-                                &stdin_fd,
-                                NULL, /* standard_output */
-                                NULL, /* standard_error */
-                                error))
+  if (search_string)
+    {
+      char *quoted_search_string = g_strdup (search_string);
+      const char *old_less_opt;
+      char *less_opt;
+
+      env = g_get_environ ();
+      old_less_opt = g_environ_getenv (env, "LESS");
+
+      if (old_less_opt)
+        less_opt = g_strconcat (old_less_opt,
+                                " --pattern=",
+                                quoted_search_string,
+                                NULL);
+      else
+        less_opt = g_strconcat ("--pattern=", quoted_search_string, NULL);
+
+      env = g_environ_setenv (env, "LESS", less_opt, TRUE);
+
+      g_free (less_opt);
+      g_free (quoted_search_string);
+    }
+
+  spawn_ret = g_spawn_async_with_pipes (NULL, /* working_dir */
+                                        (char **) pdb_man_args,
+                                        env, /* envp */
+                                        G_SPAWN_DO_NOT_REAP_CHILD |
+                                        G_SPAWN_SEARCH_PATH,
+                                        NULL, /* child_setup_func */
+                                        NULL, /* user_data */
+                                        &pid,
+                                        &stdin_fd,
+                                        NULL, /* standard_output */
+                                        NULL, /* standard_error */
+                                        error);
+
+  if (env)
+    g_strfreev (env);
+
+  if (spawn_ret)
     {
       FILE *stdin_stream;
 

@@ -31,7 +31,8 @@ typedef enum
 } PbbGroffError;
 
 PdbMan *
-pdb_man_new (GError **error);
+pdb_man_new (const char *search_string,
+             GError **error);
 
 gboolean
 pdb_man_display (PdbMan *groff,
