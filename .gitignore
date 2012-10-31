@@ -10,6 +10,16 @@
 /depcomp
 /install-sh
 /missing
+/mkinstalldirs
+/autotools/gettext.m4
+/autotools/iconv.m4
+/autotools/intltool.m4
+/autotools/lib-ld.m4
+/autotools/lib-link.m4
+/autotools/lib-prefix.m4
+/autotools/nls.m4
+/autotools/po.m4
+/autotools/progtest.m4
 /src/Makefile
 /src/Makefile.in
 /src/prevodb
@@ -19,6 +29,13 @@
 /src/dump-marks
 /src/test-doc
 /stamp-h1
+/po/Makefile
+/po/Makefile.in
+/po/Makefile.in.in
+/po/POTFILES
+/po/stamp-it
+/po/prevo.pot
+/po/*.gmo
 
 .deps
 *.o

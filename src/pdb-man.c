@@ -18,6 +18,7 @@
 #include "config.h"
 
 #include <glib.h>
+#include <glib/gi18n.h>
 #include <signal.h>
 #include <sys/wait.h>
 #include <string.h>
@@ -111,7 +112,7 @@ pdb_man_new (const char *search_string,
           g_set_error (error,
                        G_FILE_ERROR,
                        g_file_error_from_errno (errno),
-                       "Error starting groff: %s",
+                       _("Error starting groff: %s"),
                        strerror (errno));
           close (stdin_fd);
           kill_process (pid);
@@ -148,7 +149,7 @@ pdb_man_display (PdbMan *groff,
       g_set_error (error,
                    G_FILE_ERROR,
                    g_file_error_from_errno (errno),
-                   "Error writing to groff: %s", strerror (errno));
+                   _("Error writing to groff: %s"), strerror (errno));
       return FALSE;
     }
 
@@ -162,7 +163,7 @@ pdb_man_display (PdbMan *groff,
       g_set_error (error,
                    G_FILE_ERROR,
                    g_file_error_from_errno (errno),
-                   "Error waiting for groff: %s", strerror (errno));
+                   _("Error waiting for groff: %s"), strerror (errno));
       return FALSE;
     }
 
@@ -171,7 +172,7 @@ pdb_man_display (PdbMan *groff,
       g_set_error (error,
                    PDB_MAN_ERROR,
                    PDB_MAN_ERROR_STATUS,
-                   "Failed to run groff");
+                   _("Failed to run groff"));
       return FALSE;
     }
 

@@ -17,6 +17,7 @@
 
 #include "config.h"
 
+#include <glib/gi18n.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -64,7 +65,7 @@ pdb_lang_start_element_cb (void *user_data,
       pdb_xml_abort (lang->parser,
                      PDB_ERROR,
                      PDB_ERROR_BAD_FORMAT,
-                     "Unexpected tag in a ‘lingvo’ tag");
+                     _("Unexpected tag in a ‘lingvo’ tag"));
     }
   else if (!strcmp (name, "lingvo"))
     {

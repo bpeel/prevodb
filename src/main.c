@@ -18,6 +18,8 @@
 #include "config.h"
 
 #include <stdio.h>
+#include <glib/gi18n.h>
+#include <locale.h>
 
 #include "pdb-revo.h"
 #include "pdb-db.h"
@@ -31,15 +33,15 @@ options[] =
   {
     {
       "single", 's', 0, G_OPTION_ARG_NONE, &option_single,
-      "Generate a single file instead of a db for Android", NULL
+      N_("Generate a single file instead of a db for Android"), NULL
     },
     {
       "in", 'i', 0, G_OPTION_ARG_STRING, &option_in_file,
-      "The zip file or directory containing the ReVo XML files", NULL
+      N_("The zip file or directory containing the ReVo XML files"), NULL
     },
     {
       "out", 'o', 0, G_OPTION_ARG_STRING, &option_out_file,
-      "Location for the output of the database", NULL
+      N_("Location for the output of the database"), NULL
     },
     { NULL, 0, 0, 0, NULL, NULL, NULL }
   };
@@ -58,8 +60,10 @@ process_arguments (int *argc, char ***argv,
                               NULL, /* user_data */
                               NULL /* destroy notify */);
   g_option_group_add_entries (group, options);
-  context = g_option_context_new ("- Creates a compact database from the "
-                                  "ReVo XML files");
+  g_option_group_set_translation_domain (group, GETTEXT_PACKAGE);
+  context = g_option_context_new (_("- Creates a compact database from the "
+                                    "ReVo XML files"));
+  g_option_context_set_translation_domain (context, GETTEXT_PACKAGE);
   g_option_context_set_main_group (context, group);
   ret = g_option_context_parse (context, argc, argv, error);
   g_option_context_free (context);
@@ -69,13 +73,13 @@ process_arguments (int *argc, char ***argv,
       if (*argc > 1)
         {
           g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_UNKNOWN_OPTION,
-                       "Unknown option '%s'", (* argv)[1]);
+                       _("Unknown option '%s'"), (* argv)[1]);
           ret = FALSE;
         }
       else if (option_in_file == NULL || option_out_file == NULL)
         {
           g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_BAD_VALUE,
-                       "The -i and -o options are required. See --help");
+                       _("The -i and -o options are required. See --help"));
           ret = FALSE;
         }
     }
@@ -89,6 +93,11 @@ main (int argc, char **argv)
   GError *error = NULL;
   PdbRevo *revo;
   int ret = 0;
+
+  setlocale (LC_ALL, "");
+  bindtextdomain (GETTEXT_PACKAGE, LOCALEDIR);
+  bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8");
+  textdomain (GETTEXT_PACKAGE);
 
   if (!process_arguments (&argc, &argv, &error))
     {

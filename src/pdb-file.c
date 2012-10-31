@@ -17,6 +17,7 @@
 
 #include "config.h"
 
+#include <glib/gi18n.h>
 #include <glib.h>
 #include <stdio.h>
 #include <glib/gstdio.h>
@@ -117,7 +118,7 @@ pdb_file_read (PdbFile *file,
         g_set_error (error,
                      G_FILE_ERROR,
                      G_FILE_ERROR_IO,
-                     "%s: Unexpected EOF", file->filename);
+                     _("%s: Unexpected EOF"), file->filename);
 
       return FALSE;
     }

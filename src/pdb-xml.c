@@ -17,6 +17,7 @@
 
 #include "config.h"
 
+#include <glib/gi18n.h>
 #include <expat.h>
 #include <string.h>
 #include <stdarg.h>
@@ -67,7 +68,7 @@ pdb_xml_get_attribute (const XML_Char *element_name,
     }
 
   g_set_error (error, PDB_ERROR, PDB_ERROR_BAD_FORMAT,
-               "Missing attribute “%s” on element “%s”",
+               _("Missing attribute “%s” on element “%s”"),
                attribute_name,
                element_name);
 
@@ -218,8 +219,8 @@ pdb_xml_external_entity_ref_cb (XML_Parser xml_parser,
       g_set_error (&parser->abort_error,
                    PDB_ERROR,
                    PDB_ERROR_BAD_FORMAT,
-                   "%s:%i:%i: An external entity was encountered "
-                   "without a system id",
+                   _("%s:%i:%i: An external entity was encountered "
+                     "without a system id"),
                    pdb_xml_get_current_filename (parser),
                    pdb_xml_get_current_line_number (parser),
                    pdb_xml_get_current_column_number (parser));

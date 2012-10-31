@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <glib/gstdio.h>
+#include <glib/gi18n.h>
 
 #include "pdb-db.h"
 #include "pdb-lang.h"
@@ -517,7 +518,7 @@ pdb_db_get_trd_link (PdbDb *db,
       g_set_error (error,
                    PDB_ERROR,
                    PDB_ERROR_BAD_FORMAT,
-                   "%s tag found with unknown parent %s",
+                   _("%s tag found with unknown parent %s"),
                    trd_elem->name,
                    parent->name);
       return FALSE;
@@ -530,7 +531,7 @@ pdb_db_get_trd_link (PdbDb *db,
       g_set_error (error,
                    PDB_ERROR,
                    PDB_ERROR_BAD_FORMAT,
-                   "drv node found without a kap");
+                   _("drv node found without a kap"));
       return FALSE;
     }
 
@@ -711,7 +712,7 @@ pdb_db_add_translation_index (PdbDb *db,
       g_set_error (error,
                    PDB_ERROR,
                    PDB_ERROR_BAD_FORMAT,
-                   "%s element with no lng attribute",
+                   _("%s element with no lng attribute"),
                    element->name);
       return FALSE;
     }
@@ -756,7 +757,7 @@ pdb_db_handle_translation (PdbDb *db,
       g_set_error (error,
                    PDB_ERROR,
                    PDB_ERROR_BAD_FORMAT,
-                   "%s element with no lng attribute",
+                   _("%s element with no lng attribute"),
                    element->name);
       return FALSE;
     }
@@ -978,7 +979,7 @@ pdb_db_resolve_reference (PdbDb *db,
                 if ((mark = g_hash_table_lookup (db->marks, mark_copy)))
                   {
                     fprintf (stderr,
-                             "using less precise mark \"%s\" for \"%s\"\n",
+                             _("using less precise mark \"%s\" for \"%s\"\n"),
                              mark_copy,
                              ref->d.mark);
                     break;
@@ -998,7 +999,7 @@ pdb_db_resolve_reference (PdbDb *db,
             *article_num = 0;
             *section_num = 0;
             fprintf (stderr,
-                     "no mark found for reference \"%s\"\n",
+                     _("no mark found for reference \"%s\"\n"),
                      ref->d.mark);
             ret = FALSE;
           }
@@ -1311,7 +1312,7 @@ pdb_db_handle_ref (PdbDb *db,
   g_set_error (error,
                PDB_ERROR,
                PDB_ERROR_BAD_FORMAT,
-               "<ref> tag found with a cel attribute");
+               _("<ref> tag found with a cel attribute"));
   return FALSE;
 
  found_cel:
@@ -1777,7 +1778,7 @@ pdb_db_parse_drv (PdbDb *db,
       g_set_error (error,
                    PDB_ERROR,
                    PDB_ERROR_BAD_FORMAT,
-                   "<drv> tag found with no <kap>");
+                   _("<drv> tag found with no <kap>"));
       return NULL;
     }
 
@@ -1926,7 +1927,7 @@ pdb_db_parse_subart (PdbDb *db,
                   g_set_error (error,
                                PDB_ERROR,
                                PDB_ERROR_BAD_FORMAT,
-                               "<%s> tag found in <subart> that has a <drv>",
+                               _("<%s> tag found in <subart> that has a <drv>"),
                                element->name);
                   return FALSE;
                 }
@@ -1944,8 +1945,8 @@ pdb_db_parse_subart (PdbDb *db,
                     g_set_error (error,
                                  PDB_ERROR,
                                  PDB_ERROR_BAD_FORMAT,
-                                 "Unexpected bare text in <subart> that "
-                                 "has a <drv>");
+                                 _("Unexpected bare text in <subart> that "
+                                   "has a <drv>"));
                     return FALSE;
                   }
             }
@@ -1992,7 +1993,7 @@ pdb_db_parse_article (PdbDb *db,
       g_set_error (error,
                    PDB_ERROR,
                    PDB_ERROR_BAD_FORMAT,
-                   "<art> tag found with no <kap>");
+                   _("<art> tag found with no <kap>"));
       return NULL;
     }
 
@@ -2003,7 +2004,7 @@ pdb_db_parse_article (PdbDb *db,
       g_set_error (error,
                    PDB_ERROR,
                    PDB_ERROR_BAD_FORMAT,
-                   "<kap> tag found with no <rad>");
+                   _("<kap> tag found with no <rad>"));
       return NULL;
     }
 
@@ -2072,7 +2073,7 @@ pdb_db_parse_article (PdbDb *db,
 
           if (sections.head == NULL)
             fprintf (stderr,
-                     "no content found for article “%s”\n",
+                     _("no content found for article “%s”\n"),
                      article->title.text);
 
           if (sections.head == NULL ||
@@ -2266,7 +2267,7 @@ pdb_db_new (PdbRevo *revo,
                 {
                   if (db->articles->len <= old_len)
                     fprintf (stderr,
-                             "no articles found in %s\n",
+                             _("no articles found in %s\n"),
                              file);
                   else
                     {

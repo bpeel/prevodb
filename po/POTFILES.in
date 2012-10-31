@@ -1,0 +1,9 @@
+# List of source files which contain translatable strings.
+src/main.c
+src/pdb-db.c
+src/pdb-file.c
+src/pdb-lang.c
+src/pdb-man.c
+src/pdb-revo.c
+src/pdb-xml.c
+src/prevo.c

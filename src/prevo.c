@@ -17,6 +17,8 @@
 
 #include "config.h"
 
+#include <glib/gi18n.h>
+#include <locale.h>
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
@@ -54,15 +56,15 @@ options[] =
   {
     {
       "db", 'd', 0, G_OPTION_ARG_STRING, &option_db_file,
-      "Location of the database file", NULL
+      N_("Location of the database file"), NULL
     },
     {
       "complete", 'c', 0, G_OPTION_ARG_NONE, &option_complete,
-      "Show completions for the word instead of an article", NULL
+      N_("Show completions for the word instead of an article"), NULL
     },
     {
       "raw", 'r', 0, G_OPTION_ARG_NONE, &option_raw,
-      "Show the raw nroff doc instead of piping it through man", NULL
+      N_("Show the raw nroff doc instead of piping it through man"), NULL
     },
     { NULL, 0, 0, 0, NULL, NULL, NULL }
   };
@@ -87,7 +89,9 @@ process_arguments (int *argc, char ***argv,
                               NULL, /* user_data */
                               NULL /* destroy notify */);
   g_option_group_add_entries (group, options);
-  context = g_option_context_new ("[language] <word>");
+  g_option_group_set_translation_domain (group, GETTEXT_PACKAGE);
+  context = g_option_context_new (_("[language] <word>"));
+  g_option_context_set_translation_domain (context, GETTEXT_PACKAGE);
   g_option_context_set_main_group (context, group);
   ret = g_option_context_parse (context, argc, argv, error);
   g_option_context_free (context);
@@ -97,7 +101,7 @@ process_arguments (int *argc, char ***argv,
       if (*argc > 3)
         {
           g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_UNKNOWN_OPTION,
-                       "Unknown option '%s'", (* argv)[3]);
+                       _("Unknown option '%s'"), (* argv)[3]);
           ret = FALSE;
         }
       else if (*argc == 2)
@@ -113,7 +117,7 @@ process_arguments (int *argc, char ***argv,
       else
         {
           g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_BAD_VALUE,
-                       "A word to lookup must be specified. See --help");
+                       _("A word to lookup must be specified. See --help"));
           ret = FALSE;
         }
     }
@@ -302,7 +306,7 @@ map_language_trie (PdbFile *file,
       g_set_error (error,
                    PREVO_ERROR,
                    PREVO_ERROR_NO_SUCH_LANGUAGE,
-                   "The language “%s” was not found in the database",
+                   _("The language “%s” was not found in the database"),
                    language);
       return FALSE;
     }
@@ -326,7 +330,7 @@ map_language_trie (PdbFile *file,
       g_set_error (error,
                    PREVO_ERROR,
                    PREVO_ERROR_INVALID_FORMAT,
-                   "%s: Invalid trie size", file->filename);
+                   _("%s: Invalid trie size"), file->filename);
       return FALSE;
     }
 
@@ -1007,7 +1011,7 @@ show_spanned_string (PdbFile *file,
               g_set_error (error,
                            PREVO_ERROR,
                            PREVO_ERROR_INVALID_FORMAT,
-                           "%s: Invalid span",
+                           _("%s: Invalid span"),
                            file->filename);
               ret = FALSE;
               break;
@@ -1151,7 +1155,7 @@ show_article (PdbFile *file,
       g_set_error (error,
                    PREVO_ERROR,
                    PREVO_ERROR_INVALID_FORMAT,
-                   "Index points to an invalid article number %i",
+                   _("Index points to an invalid article number %i"),
                    article_num);
       return FALSE;
     }
@@ -1318,7 +1322,7 @@ search_article (PdbFile *file,
       g_set_error (error,
                    PREVO_ERROR,
                    PREVO_ERROR_NO_SUCH_ARTICLE,
-                   "No article found for “%s”",
+                   _("No article found for “%s”"),
                    word);
       ret = FALSE;
     }
@@ -1346,7 +1350,7 @@ process_file (const char *db_filename,
               g_set_error (error,
                            PREVO_ERROR,
                            PREVO_ERROR_INVALID_FORMAT,
-                           "%s is not a PReVo database",
+                           _("%s is not a PReVo database"),
                            db_filename);
               ret = FALSE;
             }
@@ -1379,6 +1383,11 @@ main (int argc, char **argv)
   GError *error = NULL;
   int ret = 0;
 
+  setlocale (LC_ALL, "");
+  bindtextdomain (GETTEXT_PACKAGE, LOCALEDIR);
+  bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8");
+  textdomain (GETTEXT_PACKAGE);
+
   if (!process_arguments (&argc, &argv, &error))
     {
       fprintf (stderr, "%s\n", error->message);
@@ -1393,8 +1402,8 @@ main (int argc, char **argv)
       if (db_filename == NULL)
         {
           fprintf (stderr,
-                   "No database file found. You can specify directly it "
-                   "with the -d option\n");
+                   _("No database file found. You can specify it directly "
+                     "with the -d option\n"));
           ret = 1;
         }
       else

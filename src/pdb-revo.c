@@ -17,6 +17,7 @@
 
 #include "config.h"
 
+#include <glib/gi18n.h>
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
@@ -139,7 +140,7 @@ pdb_revo_check_error (PdbRevoFile *file,
                    "%s",
                    file->error_buf->str[0] ?
                    file->error_buf->str :
-                   "Unzip failed");
+                   _("Unzip failed"));
       return FALSE;
     }
 
@@ -378,7 +379,7 @@ pdb_revo_list_files_process_line (PdbRevoListFilesData *data,
   g_set_error (error,
                PDB_ERROR,
                PDB_ERROR_UNZIP_FAILED,
-               "Unexepected data from unzip");
+               _("Unexpected data from unzip"));
 
   return FALSE;
 }
@@ -395,7 +396,7 @@ pdb_revo_list_files_handle_data (PdbRevoListFilesData *data,
   if (memchr (buf, '\0', len))
     {
       g_set_error (error, PDB_ERROR, PDB_ERROR_BAD_FORMAT,
-                   "%s", "Embedded '\0' found in unzip listing");
+                   "%s", _("Embedded '\\0' found in unzip listing"));
       return FALSE;
     }
 
