@@ -86,6 +86,11 @@ test_doc_SOURCES = \
 	test-doc.c \
 	$(NULL)
 
+test_doc_LDADD = \
+	@GLIB_LIBS@ \
+	-lexpat \
+	$(NULL)
+
 dump_marks_SOURCES = \
 	dump-marks.c \
 	pdb-error.c \
@@ -95,9 +100,5 @@ dump_marks_SOURCES = \
 
 dump_marks_LDADD = \
 	@GLIB_LIBS@ \
+	-lexpat \
 	$(NULL)
-
-test_doc_LDADD = \
-	@GLIB_LIBS@ \
-	$(NULL)
-

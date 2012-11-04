@@ -28,7 +28,7 @@ CFLAGS="$CFLAGS -Wcast-align -Wuninitialized -Wno-strict-aliasing -Wempty-body -
 PKG_CHECK_MODULES(GLIB, [glib-2.0])
 
 AC_CHECK_HEADER([expat.h], [have_expat=yes], [have_expat=no])
-AC_CHECK_LIB([expat], [XML_ParserCreate], [], [have_expat=no])
+AC_CHECK_LIB([expat], [XML_ParserCreate], [true], [have_expat=no])
 
 AS_IF([test "x$have_expat" = "xno"], [AC_MSG_ERROR([Expat is required])])
 
