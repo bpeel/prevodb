@@ -49,7 +49,7 @@ Elpaku tiun pakaĵon en unu dosieron:
 Tio postulas iom da tempo kaj ĝi verŝajne plendos pri kelkaj eraroj.
 Tiuj kutime estas ignoreblaj.
 
-Nun vi povas serĉi la vortaron per tajpi ‘prevo <vorto>’. Ekzemple:
+Nun vi povas serĉi en la vortaro per tajpi ‘prevo <vorto>’. Ekzemple:
 
  prevo terpomo
 
@@ -61,7 +61,7 @@ lingvo. Ekzemple:
 Kompletigo en Bash
 ==================
 
-PReVo ankaŭ subtenas kompletigon en Bash. Ekzemple vi povos tajpi nur
+PReVo ankaŭ subtenas kompletigon en Bash. Ekzemple vi povas tajpi nur
 ‘prevo terp’ kaj premu na ‘tab’ dufoje kaj ĝi montros la liston de
 kompletigoj:
 
@@ -81,4 +81,4 @@ malloka dosierujo ĉi tiel:
  sudo cp src/prevo-completion /etc/bash_completion.d/
 
 Tiel ĝi automate inkluzivos la kodon kiam oni ekkompletigas ion kio
-komencas per ‘prevo’.
+komenciĝas per ‘prevo’.
