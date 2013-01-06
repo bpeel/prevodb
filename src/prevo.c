@@ -1,6 +1,6 @@
 /*
  * PReVo - A portable version of ReVo for Android
- * Copyright (C) 2012  Neil Roberts
+ * Copyright (C) 2012, 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -39,17 +39,22 @@
 typedef enum
 {
   PREVO_ERROR_INVALID_FORMAT,
+  PREVO_ERROR_UNSUPPORTED_VERSION,
   PREVO_ERROR_NO_SUCH_LANGUAGE,
   PREVO_ERROR_NO_SUCH_ARTICLE
 } PrevoError;
 
-static const char prevo_magic[4] = "PRDB";
+static const char prevo_magic[3] = "PRD";
 
 static const char *option_db_file = NULL;
 static const char *option_language = NULL;
 static const char *option_word = NULL;
 static gboolean option_raw = FALSE;
 static gboolean option_complete = FALSE;
+
+#define MIN_SUPPORTED_VERSION ((int) 'B')
+#define MAX_SUPPORTED_VERSION ((int) 'C')
+#define LANGUAGE_CODE_VERSION ((int) 'C')
 
 static GOptionEntry
 options[] =
@@ -1130,6 +1135,7 @@ start_paragraph (WriteData *write_data)
 
 static gboolean
 show_article (PdbFile *file,
+              int version,
               int article_num,
               int mark_num,
               GError **error)
@@ -1201,6 +1207,13 @@ show_article (PdbFile *file,
               start_paragraph (&write_data);
 
               fputs (".SH ", write_data.out);
+
+              if (version >= LANGUAGE_CODE_VERSION &&
+                  !pdb_file_seek (file, 3, SEEK_CUR, error))
+                {
+                  ret = FALSE;
+                  break;
+                }
 
               if (!show_spanned_string_argument (file, &write_data, error))
                 {
@@ -1290,6 +1303,7 @@ extract_article_and_mark (const guint8 *trie_start,
 
 static gboolean
 search_article (PdbFile *file,
+                int version,
                 const char *language,
                 const char *word,
                 GError **error)
@@ -1316,7 +1330,7 @@ search_article (PdbFile *file,
   unmap_region (&map_data);
 
   if (article_num != -1)
-    ret = show_article (file, article_num, mark_num, error);
+    ret = show_article (file, version, article_num, mark_num, error);
   else
     {
       g_set_error (error,
@@ -1341,16 +1355,36 @@ process_file (const char *db_filename,
 
   if (pdb_file_open (&file, db_filename, PDB_FILE_MODE_READ, error))
     {
-      char magic[sizeof (prevo_magic)];
+      char magic[sizeof (prevo_magic) + 1];
 
       if (pdb_file_read (&file, magic, sizeof (magic), error))
         {
-          if (memcmp (magic, prevo_magic, sizeof (magic)))
+          int version = magic[sizeof (prevo_magic)] & 0xff;
+
+          if (memcmp (magic, prevo_magic, sizeof (prevo_magic)))
             {
               g_set_error (error,
                            PREVO_ERROR,
                            PREVO_ERROR_INVALID_FORMAT,
                            _("%s is not a PReVo database"),
+                           db_filename);
+              ret = FALSE;
+            }
+          else if (version < MIN_SUPPORTED_VERSION)
+            {
+              g_set_error (error,
+                           PREVO_ERROR,
+                           PREVO_ERROR_UNSUPPORTED_VERSION,
+                           _("%s is using a database format that is too old"),
+                           db_filename);
+              ret = FALSE;
+            }
+          else if (version > MAX_SUPPORTED_VERSION)
+            {
+              g_set_error (error,
+                           PREVO_ERROR,
+                           PREVO_ERROR_UNSUPPORTED_VERSION,
+                           _("%s is using an unknown database version"),
                            db_filename);
               ret = FALSE;
             }
@@ -1362,7 +1396,11 @@ process_file (const char *db_filename,
                                   error))
                 ret = FALSE;
             }
-          else if (!search_article (&file, option_language, option_word, error))
+          else if (!search_article (&file,
+                                    version,
+                                    option_language,
+                                    option_word,
+                                    error))
             ret = FALSE;
         }
       else

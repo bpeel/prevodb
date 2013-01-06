@@ -44,7 +44,20 @@
 /* Each article in the file has the following format:
  * • A 4-byte little endian number representing the size of the
  *   article data in bytes
- * Next follows a list of strings. Each string comprises of:
+ * • A spanned string representing the title of the article.
+ * • A list of sections for the article.
+ *
+ * Each section consists of the following:
+ *
+ * • A three-byte string representing the language code for this
+ *   section. If the code is shorter than three bytes then the
+ *   remaining bytes will be set to zero. The code will usually be
+ *   ‘eo’ for esperanto but it can but other codes for the translated
+ *   sections.
+ * • A spanned string for the section title.
+ * • A spanned string with the section contents.
+ *
+ * A spanned string comprises of:
  * • A two byte little endian number for the length of the string data
  * • The string data in UTF-8
  * • A list of string spans. These comprise of:
@@ -56,19 +69,13 @@
  *   The list of spans is terminated by two zero bytes (which would otherwise
  *   appear as the start of a zero-length span).
  *
- * The first string represents the title of the article. This would
- * usually be the root of the word.
- *
- * The subsequent strings are in pairs where the first string is the
- * title for the section and the second string is the content. There
- * can be sections with an empty title.
- *
  * The length and string offset are counted in 16-bit units as if the
  * string was encoded in UTF-16.
  */
 
 /* If a single output file is selected, the format is as follows:
- * • Four bytes for the magic string ‘PRDB’
+ * • Three bytes for the magic string ‘PRD’
+ * • A one byte file format version number. The current version is 67
  * • Four bytes in little-endian format representing the number of articles.
  * • Four bytes in little-endian for each article representing the
  *   offset in the file to the data for that article.
@@ -89,7 +96,17 @@
  *     as counts of UTF-16 code points.
  */
 
-static const char pdb_db_magic[4] = "PRDB";
+/* The first version of the database is 66 because the magic string
+ * used to be the four letter code ‘PRDB’. The B has been hijacked as
+ * a version number.
+ *
+ * Subsequent changes to the format are:
+ *
+ * Version 67:
+ * • The language codes for each section were added.
+ */
+
+static const char pdb_db_magic[4] = "PRDC";
 
 typedef struct
 {
@@ -103,6 +120,7 @@ typedef struct
 typedef struct
 {
   int section_num;
+  char lang_code[4];
 
   PdbDbSpannableString title;
   PdbDbSpannableString text;
@@ -805,6 +823,15 @@ pdb_db_handle_translation (PdbDb *db,
                    element->name);
       return FALSE;
     }
+  else if (strlen (lang_code) > 3)
+    {
+      g_set_error (error,
+                   PDB_ERROR,
+                   PDB_ERROR_BAD_FORMAT,
+                   _("The language code “%s” is too long"),
+                   lang_code);
+      return FALSE;
+    }
 
   if ((data = g_hash_table_lookup (db->translations,
                                    lang_code)) == NULL)
@@ -947,6 +974,18 @@ pdb_db_find_translations (PdbDb *db,
   return ret;
 }
 
+static PdbDbSection *
+pdb_db_section_new (const char *lang_code)
+{
+  PdbDbSection *section = g_slice_new (PdbDbSection);
+  int code_len = strlen (lang_code);
+
+  memcpy (section->lang_code, lang_code, code_len);
+  memset (section->lang_code + code_len, 0, 4 - code_len);
+
+  return section;
+}
+
 static GList *
 pdb_db_flush_translations (PdbDb *db)
 {
@@ -966,7 +1005,7 @@ pdb_db_flush_translations (PdbDb *db)
       const char *lang_name = pdb_lang_get_name (db->lang, lang_code);
       PdbDbTranslationData *data =
         g_hash_table_lookup (db->translations, lang_code);
-      PdbDbSection *section = g_slice_new (PdbDbSection);
+      PdbDbSection *section = pdb_db_section_new (lang_code);
 
       if (lang_name == NULL)
         lang_name = lang_code;
@@ -1827,7 +1866,7 @@ pdb_db_parse_drv (PdbDb *db,
       return NULL;
     }
 
-  section = g_slice_new (PdbDbSection);
+  section = pdb_db_section_new ("eo");
 
   pdb_db_add_kap_index (db, kap, article, section);
 
@@ -1905,7 +1944,7 @@ pdb_db_parse_subart (PdbDb *db,
      * own, but the article for '-il' seems to do it anyway */
     subart_num = 0;
 
-  section = g_slice_new (PdbDbSection);
+  section = pdb_db_section_new ("eo");
 
   buf = g_string_new (NULL);
   pdb_roman_to_text_append (subart_num + 1, buf);
@@ -2483,7 +2522,8 @@ pdb_db_save_article (PdbDb *db,
     {
       PdbDbSection *section = sl->data;
 
-      if (!pdb_db_write_string (db, &section->title, single, out, error) ||
+      if (!pdb_file_write (out, section->lang_code, 3, error) ||
+          !pdb_db_write_string (db, &section->title, single, out, error) ||
           !pdb_db_write_string (db, &section->text, single, out, error))
         return FALSE;
     }

@@ -1,6 +1,6 @@
 /*
  * PReVo - A portable version of ReVo for Android
- * Copyright (C) 2012  Neil Roberts
+ * Copyright (C) 2012, 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -48,10 +48,26 @@ static gboolean
 dump_article (const guint8 *article_data,
               int article_length)
 {
+  int string_num = 0;
+
   while (article_length > 0)
     {
       int text_length;
       int utf16_length;
+
+      if ((string_num & 1))
+        {
+          if (article_length < 3)
+            {
+              fprintf (stderr,
+                       "Not enough room for language code in article\n");
+              return FALSE;
+            }
+
+          printf ("[%.3s] ", article_data);
+          article_data += 3;
+          article_length -= 3;
+        }
 
       if (article_length < 2)
         {
@@ -135,6 +151,8 @@ dump_article (const guint8 *article_data,
           article_data += 7;
           article_length -= 7;
         }
+
+      string_num++;
     }
 
   return TRUE;
