@@ -276,6 +276,21 @@ pdb_db_reference_copy (const PdbDbReference *entry_in)
   return entry_out;
 }
 
+static const char *
+pdb_db_reference_get_name (const PdbDbReference *ref)
+{
+  switch (ref->type)
+    {
+    case PDB_DB_REFERENCE_TYPE_MARK:
+      return ref->d.mark;
+
+    case PDB_DB_REFERENCE_TYPE_DIRECT:
+      return ref->d.direct.section->title.text;
+    }
+
+  g_assert_not_reached ();
+}
+
 static void
 pdb_db_link_free (PdbDbLink *link)
 {
@@ -290,7 +305,29 @@ pdb_db_add_index_entry (PdbDb *db,
                         const char *display_name,
                         const PdbDbReference *entry_in)
 {
-  PdbTrie *trie = pdb_lang_get_trie (db->lang, lang);
+  PdbTrie *trie;
+
+  if (*name == '\0')
+    {
+      fprintf (stderr,
+               _("empty name found for index entry \"%s\" "
+                 "in language \"%s\"\n"),
+               pdb_db_reference_get_name (entry_in),
+               lang);
+      return;
+    }
+
+  if (display_name && *display_name == '\0')
+    {
+      fprintf (stderr,
+               _("empty display name found for index entry "
+                 "\"%s\" in language \"%s\"\n"),
+               pdb_db_reference_get_name (entry_in),
+               lang);
+      return;
+    }
+
+  trie = pdb_lang_get_trie (db->lang, lang);
 
   if (trie)
     {
