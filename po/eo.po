@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: prevodb 0.1\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2012-10-31 23:11+0000\n"
-"PO-Revision-Date: 2012-10-31 23:20+0000\n"
+"POT-Creation-Date: 2013-01-07 20:44+0000\n"
+"PO-Revision-Date: 2013-01-07 20:47+0000\n"
 "Last-Translator: Neil Roberts <bpeeluk@yahoo.co.uk>\n"
 "Language-Team: Esperanto\n"
 "Language: eo\n"
@@ -17,93 +17,103 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: ../src/main.c:35
+#: ../src/main.c:36
 msgid "Generate a single file instead of a db for Android"
 msgstr "Generi unuopan dosieron anstataŭ datumbazon por Android"
 
-#: ../src/main.c:39
+#: ../src/main.c:40
 msgid "The zip file or directory containing the ReVo XML files"
 msgstr "La dosierujo aŭ zip-dosiero kiu enhavas la XML-dosierojn de ReVo"
 
-#: ../src/main.c:43
+#: ../src/main.c:44
 msgid "Location for the output of the database"
 msgstr "Dosiernomo por la rezulta datumbazo"
 
-#: ../src/main.c:62
+#: ../src/main.c:64
 msgid "- Creates a compact database from the ReVo XML files"
 msgstr "- Kreas kompaktan datumbazon el la XML-dosieroj de ReVo"
 
-#: ../src/main.c:74 ../src/prevo.c:102
+#: ../src/main.c:76 ../src/prevo.c:104
 #, c-format
 msgid "Unknown option '%s'"
 msgstr "Nekonata opcio ‘%s’"
 
-#: ../src/main.c:80
+#: ../src/main.c:82
 #, c-format
 msgid "The -i and -o options are required. See --help"
 msgstr "La opcioj -i kaj -o estas bezonataj. Vidu --help"
 
-#: ../src/pdb-db.c:521
+#: ../src/pdb-db.c:320
+#, c-format
+msgid "empty name found for index entry \"%s\" in language \"%s\"\n"
+msgstr "malplena nomo trovita por la indeksero “%s” en la lingvo “%s”\n"
+
+#: ../src/pdb-db.c:330
+#, c-format
+msgid "empty display name found for index entry \"%s\" in language \"%s\"\n"
+msgstr "malplena montro-nomo trovita por la indeksero “%s” en la lingvo “%s”\n"
+
+#: ../src/pdb-db.c:565
 #, c-format
 msgid "%s tag found with unknown parent %s"
 msgstr "La etikedo %s troviĝis kun la nekonata patro %s"
 
-#: ../src/pdb-db.c:534
+#: ../src/pdb-db.c:578
 #, c-format
 msgid "drv node found without a kap"
 msgstr "Nodo drv troviĝis sen nodo kap"
 
-#: ../src/pdb-db.c:715 ../src/pdb-db.c:760
+#: ../src/pdb-db.c:759 ../src/pdb-db.c:804
 #, c-format
 msgid "%s element with no lng attribute"
 msgstr "Elemento %s troviĝis sen atributo lng"
 
-#: ../src/pdb-db.c:982
+#: ../src/pdb-db.c:1026
 #, c-format
 msgid "using less precise mark \"%s\" for \"%s\"\n"
 msgstr "uziĝas la malpli preciza marko “%s” por “%s”\n"
 
-#: ../src/pdb-db.c:1002
+#: ../src/pdb-db.c:1046
 #, c-format
 msgid "no mark found for reference \"%s\"\n"
 msgstr "neniu marko troviĝis por la referenco “%s”\n"
 
-#: ../src/pdb-db.c:1315
+#: ../src/pdb-db.c:1359
 #, c-format
 msgid "<ref> tag found with a cel attribute"
 msgstr "Etikedo <ref> troviĝis sen la atributo cel"
 
-#: ../src/pdb-db.c:1781
+#: ../src/pdb-db.c:1825
 #, c-format
 msgid "<drv> tag found with no <kap>"
 msgstr "La etikedo <drv> troviĝis sen <kap>"
 
-#: ../src/pdb-db.c:1930
+#: ../src/pdb-db.c:1974
 #, c-format
 msgid "<%s> tag found in <subart> that has a <drv>"
 msgstr "Etikedo <%s> troviĝis en <subart> kiu havas etikedon <drv>"
 
-#: ../src/pdb-db.c:1948
+#: ../src/pdb-db.c:1992
 #, c-format
 msgid "Unexpected bare text in <subart> that has a <drv>"
 msgstr "Ne atendita kruda teksto en <subart> kiu havas <drv>"
 
-#: ../src/pdb-db.c:1996
+#: ../src/pdb-db.c:2040
 #, c-format
 msgid "<art> tag found with no <kap>"
 msgstr "Etikedo <art> troviĝis sen <kap>"
 
-#: ../src/pdb-db.c:2007
+#: ../src/pdb-db.c:2051
 #, c-format
 msgid "<kap> tag found with no <rad>"
 msgstr "Etikedo <kap> troviĝis sen <rad>"
 
-#: ../src/pdb-db.c:2076
+#: ../src/pdb-db.c:2120
 #, c-format
 msgid "no content found for article “%s”\n"
 msgstr "Neniu enhavo troviĝis por la artikolo “%s”\n"
 
-#: ../src/pdb-db.c:2270
+#: ../src/pdb-db.c:2314
 #, c-format
 msgid "no articles found in %s\n"
 msgstr "neniuj artikoloj troviĝis en %s\n"
@@ -160,58 +170,58 @@ msgstr "Mankas atributo “%s” al elemento “%s”"
 msgid "%s:%i:%i: An external entity was encountered without a system id"
 msgstr "%s:%i:%i: Ekstera aĵo troviĝis kiu ne havas sisteman identigilon"
 
-#: ../src/prevo.c:58
+#: ../src/prevo.c:59
 msgid "Location of the database file"
 msgstr "Dosiernomo de la datumbazo"
 
-#: ../src/prevo.c:62
+#: ../src/prevo.c:63
 msgid "Show completions for the word instead of an article"
 msgstr "Montru kompletigojn de la vorto anstataŭ artikolon"
 
-#: ../src/prevo.c:66
+#: ../src/prevo.c:67
 msgid "Show the raw nroff doc instead of piping it through man"
 msgstr "Montru la krudan nroff-dokumenton anstataŭ ĉenigi ĝin tra man"
 
-#: ../src/prevo.c:91
+#: ../src/prevo.c:93
 msgid "[language] <word>"
 msgstr "[lingvo] <vorto>"
 
-#: ../src/prevo.c:118
+#: ../src/prevo.c:120
 #, c-format
 msgid "A word to lookup must be specified. See --help"
 msgstr "Necesas specifi vorton por kontroli. Vidu --help"
 
-#: ../src/prevo.c:307
+#: ../src/prevo.c:309
 #, c-format
 msgid "The language “%s” was not found in the database"
 msgstr "La lingvo “%s” ne troviĝis en la datumbazo"
 
-#: ../src/prevo.c:331
+#: ../src/prevo.c:333
 #, c-format
 msgid "%s: Invalid trie size"
 msgstr "%s: Nevalida grandeco de la trie"
 
-#: ../src/prevo.c:1012
+#: ../src/prevo.c:1014
 #, c-format
 msgid "%s: Invalid span"
 msgstr "%s: Nevalida etendo"
 
-#: ../src/prevo.c:1156
+#: ../src/prevo.c:1158
 #, c-format
 msgid "Index points to an invalid article number %i"
 msgstr "La indekso indikas la nevalidan artikolnumeron %i"
 
-#: ../src/prevo.c:1323
+#: ../src/prevo.c:1325
 #, c-format
 msgid "No article found for “%s”"
 msgstr "Neniu artikolo troviĝis por “%s”"
 
-#: ../src/prevo.c:1351
+#: ../src/prevo.c:1353
 #, c-format
 msgid "%s is not a PReVo database"
 msgstr "%s ne estas datumbazo de PReVo"
 
-#: ../src/prevo.c:1402
+#: ../src/prevo.c:1405
 #, c-format
 msgid ""
 "No database file found. You can specify it directly with the -d option\n"
