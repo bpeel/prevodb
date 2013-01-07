@@ -150,18 +150,51 @@ main (int argc, char **argv)
   for (i = 1; i < argc; i++)
     {
       const char *filename = argv[i];
-      char *article_data;
-      gsize article_length;
+      guint8 *data;
+      gsize data_length;
 
       if (g_file_get_contents (filename,
-                               &article_data,
-                               &article_length,
+                               (char **) &data,
+                               &data_length,
                                &error))
         {
-          gboolean dump_ret;
+          gboolean dump_ret = TRUE;
+          guint8 *pos;
+          gsize article_length;
 
-          dump_ret = dump_article ((const guint8 *) article_data,
-                                   article_length);
+          for (pos = data;
+               pos < data + data_length;
+               pos += article_length)
+            {
+              if (article_length - (pos - data) < sizeof (guint32))
+                {
+                  dump_ret = FALSE;
+                  break;
+                }
+
+              article_length = (pos[0] |
+                                (pos[1] << 8) |
+                                (pos[2] << 16) |
+                                (pos[2] << 24));
+              pos += sizeof (guint32);
+
+              if (article_length + (pos - data) > data_length)
+                {
+                  fprintf (stderr,
+                           "%s: invalid article length encountered\n",
+                           filename);
+                }
+
+              printf ("****\n");
+
+              if (!dump_article (pos, article_length))
+                {
+                  dump_ret = FALSE;
+                  break;
+                }
+            }
+
+          g_free (data);
 
           if (!dump_ret)
             {

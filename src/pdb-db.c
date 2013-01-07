@@ -35,7 +35,16 @@
 #include "pdb-file.h"
 #include "pdb-span.h"
 
-/* The article file format is a list of strings. Each string comprises of:
+/* An article file comprises of up to 16 articles. The articles are
+ * bundled together to reduce the number of files because the package
+ * installer in older versions of Android seems to have a bug with
+ * large numbers of files. We don't want to put them all in one file
+ * however because it is not possible to seek within an asset file. */
+
+/* Each article in the file has the following format:
+ * • A 4-byte little endian number representing the size of the
+ *   article data in bytes
+ * Next follows a list of strings. Each string comprises of:
  * • A two byte little endian number for the length of the string data
  * • The string data in UTF-8
  * • A list of string spans. These comprise of:
@@ -76,8 +85,6 @@
  *   • The data for the index as described in pdb-trie.c
  * • The data for each article in the format described above except for the
  *   following:
- *   • Before the title string there is a 4-byte little endian number
- *     representing the size of the article data in bytes
  *   • The span offsets and lengths are stored as byte counts rather than
  *     as counts of UTF-16 code points.
  */
@@ -2451,6 +2458,15 @@ pdb_db_save_article (PdbDb *db,
                      GError **error)
 {
   GList *sl;
+  int old_pos = out->pos;
+  int article_len;
+
+  /* Leave space for the article size */
+  if (!pdb_file_seek (out,
+                      sizeof (guint32),
+                      SEEK_CUR,
+                      error))
+    return FALSE;
 
   if (!pdb_db_write_string (db, &article->title, single, out, error))
     return FALSE;
@@ -2464,6 +2480,16 @@ pdb_db_save_article (PdbDb *db,
         return FALSE;
     }
 
+  /* Fill in the article size */
+  article_len = out->pos - old_pos - sizeof (guint32);
+  if (!pdb_file_seek (out,
+                      old_pos,
+                      SEEK_SET,
+                      error) ||
+      !pdb_file_write_32 (out, article_len, error) ||
+      !pdb_file_seek (out, article_len, SEEK_CUR, error))
+    return FALSE;
+
   return TRUE;
 }
 
@@ -2473,35 +2499,54 @@ pdb_db_save (PdbDb *db,
              GError **error)
 {
   gboolean ret = TRUE;
+  int group_num;
 
   if (!pdb_lang_save (db->lang, dir, error))
     return FALSE;
 
   if (pdb_try_mkdir (error, dir, "assets", "articles", NULL))
     {
-      int i;
+      int max_group = (db->articles->len + 15) / 16;
 
-      for (i = 0; i < db->articles->len; i++)
+      for (group_num = 0; group_num < max_group; group_num++)
         {
-          PdbDbArticle *article = g_ptr_array_index (db->articles, i);
-          char *article_name = g_strdup_printf ("article-%i.bin", i);
+          PdbFile out;
+          char *article_name =
+            g_strdup_printf ("article-%03xx.bin", group_num);
+          gboolean write_status = TRUE;
           char *full_name = g_build_filename (dir,
                                               "assets",
                                               "articles",
                                               article_name,
                                               NULL);
-          gboolean write_status = TRUE;
-          PdbFile out;
 
           if (!pdb_file_open (&out, full_name, PDB_FILE_MODE_WRITE, error))
             write_status = FALSE;
           else
             {
-              write_status = pdb_db_save_article (db,
-                                                  article,
-                                                  FALSE, /* single */
-                                                  &out,
-                                                  error);
+              int page_num, max_page;
+
+              if ((db->articles->len & 0xf) && group_num + 1 >= max_group)
+                max_page = db->articles->len & 0xf;
+              else
+                max_page = 16;
+
+              for (page_num = 0; page_num < max_page; page_num++)
+                {
+                  PdbDbArticle *article =
+                    g_ptr_array_index (db->articles, group_num * 16 + page_num);
+
+                  if (!pdb_db_save_article (db,
+                                            article,
+                                            FALSE, /* single */
+                                            &out,
+                                            error))
+                    {
+                      write_status = FALSE;
+                      break;
+                    }
+                }
+
               if (!pdb_file_close (&out, write_status ? error : NULL))
                 write_status = FALSE;
             }
@@ -2548,34 +2593,14 @@ pdb_db_save_single (PdbDb *db,
           for (i = 0; i < db->articles->len; i++)
             {
               PdbDbArticle *article = g_ptr_array_index (db->articles, i);
-              int old_pos = file.pos;
-              int article_len;
 
               offset_table[i] = GUINT32_TO_LE (file.pos);
 
-              /* Leave space for the article size */
-              if (!pdb_file_seek (&file,
-                                  sizeof (guint32),
-                                  SEEK_CUR,
-                                  error) ||
-                  !pdb_db_save_article (db,
+              if (!pdb_db_save_article (db,
                                         article,
                                         TRUE, /* single */
                                         &file,
                                         error))
-                {
-                  ret = FALSE;
-                  goto done;
-                }
-
-              /* Fill in the article size */
-              article_len = file.pos - old_pos - sizeof (guint32);
-              if (!pdb_file_seek (&file,
-                                  old_pos,
-                                  SEEK_SET,
-                                  error) ||
-                  !pdb_file_write_32 (&file, article_len, error) ||
-                  !pdb_file_seek (&file, article_len, SEEK_CUR, error))
                 {
                   ret = FALSE;
                   goto done;
