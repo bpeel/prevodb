@@ -1751,7 +1751,8 @@ pdb_db_add_kap_index (PdbDb *db,
         {
           PdbDocElementNode *element = (PdbDocElementNode *) node;
 
-          if (!strcmp (element->name, "tld"))
+          if (!strcmp (element->name, "tld") ||
+              !strcmp (element->name, "rad"))
             pdb_db_append_tld (db, buf, element->atts);
           else if (!strcmp (element->name, "var"))
             {
@@ -1854,6 +1855,36 @@ pdb_db_parse_drv (PdbDb *db,
 }
 
 static gboolean
+pdb_db_add_drv (PdbDb *db,
+                PdbDbArticle *article,
+                PdbDocElementNode *element,
+                GQueue *sections,
+                GError **error)
+{
+  PdbDbSection *section;
+  PdbDbReference ref;
+
+  section = pdb_db_parse_drv (db, article, element, error);
+
+  if (section == NULL)
+    return FALSE;
+
+  g_queue_push_tail (sections, section);
+
+  ref.type = PDB_DB_REFERENCE_TYPE_DIRECT;
+  ref.d.direct.article = article;
+  ref.d.direct.section = section;
+
+  if (!pdb_db_find_translations_recursive (db,
+                                           element,
+                                           &ref,
+                                           error))
+    return FALSE;
+
+  return TRUE;
+}
+
+static gboolean
 pdb_db_parse_subart (PdbDb *db,
                      PdbDbArticle *article,
                      PdbDocElementNode *root_node,
@@ -1942,24 +1973,12 @@ pdb_db_parse_subart (PdbDb *db,
 
               if (!strcmp (element->name, "drv"))
                 {
-                  PdbDbSection *section;
-
-                  section = pdb_db_parse_drv (db, article, element, error);
-
-                  if (section == NULL)
+                  if (!pdb_db_add_drv (db,
+                                       article,
+                                       element,
+                                       sections,
+                                       error))
                     return FALSE;
-                  else
-                    {
-                      g_queue_push_tail (sections, section);
-
-                      ref.d.direct.section = section;
-
-                      if (!pdb_db_find_translations_recursive (db,
-                                                               element,
-                                                               &ref,
-                                                               error))
-                        return FALSE;
-                    }
                 }
               else if (strcmp (element->name, "adm") &&
                        strcmp (element->name, "trd") &&
@@ -2068,27 +2087,11 @@ pdb_db_parse_article (PdbDb *db,
 
             if (!strcmp (element->name, "drv"))
               {
-                PdbDbSection *section;
-                PdbDbReference ref;
-
-                section = pdb_db_parse_drv (db, article, element, error);
-
-                if (section == NULL)
-                  {
-                    result = FALSE;
-                    break;
-                  }
-
-                g_queue_push_tail (&sections, section);
-
-                ref.type = PDB_DB_REFERENCE_TYPE_DIRECT;
-                ref.d.direct.article = article;
-                ref.d.direct.section = section;
-
-                if (!pdb_db_find_translations_recursive (db,
-                                                         element,
-                                                         &ref,
-                                                         error))
+                if (!pdb_db_add_drv (db,
+                                     article,
+                                     element,
+                                     &sections,
+                                     error))
                   {
                     result = FALSE;
                     break;
@@ -2110,22 +2113,29 @@ pdb_db_parse_article (PdbDb *db,
 
       if (result)
         {
-          PdbDbReference ref;
-
-          ref.type = PDB_DB_REFERENCE_TYPE_DIRECT;
-          ref.d.direct.article = article;
-
+          /* If we didn't find any content then we'll just treat
+           * the whole article as if it were a drv */
           if (sections.head == NULL)
-            fprintf (stderr,
-                     _("no content found for article “%s”\n"),
-                     article->title.text);
+            {
+              if (!pdb_db_add_drv (db, article, root_node, &sections, error))
+                result = FALSE;
+            }
+          else
+            {
+              PdbDbReference ref;
 
-          if (sections.head == NULL ||
-              (ref.d.direct.section = sections.head->data,
-               pdb_db_find_translations (db,
-                                         root_node,
-                                         &ref,
-                                         error)))
+              ref.type = PDB_DB_REFERENCE_TYPE_DIRECT;
+              ref.d.direct.article = article;
+              ref.d.direct.section = sections.head->data;
+
+              if (!pdb_db_find_translations (db,
+                                             root_node,
+                                             &ref,
+                                             error))
+                result = FALSE;
+            }
+
+          if (result)
             {
               GList *translations = pdb_db_flush_translations (db);
               int length = g_list_length (translations);
@@ -2144,8 +2154,6 @@ pdb_db_parse_article (PdbDb *db,
                   sections.length += length;
                 }
             }
-          else
-            result = FALSE;
         }
 
       if (!result)
