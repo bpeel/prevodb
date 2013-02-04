@@ -34,6 +34,7 @@
 #include "pdb-list.h"
 #include "pdb-file.h"
 #include "pdb-span.h"
+#include "pdb-trim.h"
 
 /* An article file comprises of up to 16 articles. The articles are
  * bundled together to reduce the number of files because the package
@@ -240,32 +241,6 @@ pdb_db_styles[] =
     { "POE", "(poezie) " },
     { "NEO", "(neologismo) " }
   };
-
-static void
-pdb_db_trim_buf (GString *buf)
-{
-  char *dst;
-  const char *src;
-
-  /* Skip leading spaces and replacing all sets of whitespace
-   * characters with a single space */
-  for (dst = buf->str, src = buf->str;
-       *src;
-       src++)
-    if (g_ascii_isspace (*src))
-      {
-        if (dst > buf->str && dst[-1] != ' ')
-          *(dst)++ = ' ';
-      }
-    else
-      *(dst++) = *src;
-
-  /* Remove any trailing space */
-  if (dst > buf->str && dst[-1] == ' ')
-    dst--;
-
-  g_string_set_size (buf, dst - buf->str);
-}
 
 static void
 pdb_db_reference_free (PdbDbReference *entry)
@@ -708,14 +683,14 @@ pdb_db_add_trd_index (PdbDb *db,
                                            display_name,
                                            "ofc",
                                            NULL);
-  pdb_db_trim_buf (display_name);
+  pdb_trim_buf (display_name);
 
   if ((ind = pdb_doc_get_child_element (&element->node, "ind")))
     {
       GString *real_name = g_string_new (NULL);
 
       pdb_doc_append_element_text (ind, real_name);
-      pdb_db_trim_buf (real_name);
+      pdb_trim_buf (real_name);
 
       pdb_db_add_index_entry (db,
                               lang_code,
@@ -735,7 +710,7 @@ pdb_db_add_trd_index (PdbDb *db,
                                                "ofc",
                                                "klr",
                                                NULL);
-      pdb_db_trim_buf (real_name);
+      pdb_trim_buf (real_name);
 
       pdb_db_add_index_entry (db,
                               lang_code,
@@ -858,7 +833,7 @@ pdb_db_handle_translation (PdbDb *db,
 
   content = g_string_new (NULL);
   pdb_doc_append_element_text (element, content);
-  pdb_db_trim_buf (content);
+  pdb_trim_buf (content);
   g_string_append_len (data->buf, content->str, content->len);
   g_string_free (content, TRUE);
 
@@ -1339,7 +1314,7 @@ pdb_db_add_replacement_contents (PdbDbParseState *state,
   gboolean ret;
 
   pdb_doc_append_element_text (element, buf);
-  pdb_db_trim_buf (buf);
+  pdb_trim_buf (buf);
   ret = pdb_db_add_replacement (state, buf->str, replacements, n_replacements);
   g_string_free (buf, TRUE);
 
@@ -1813,7 +1788,7 @@ pdb_db_add_kap_index (PdbDb *db,
   entry.d.direct.article = article;
   entry.d.direct.section = section;
 
-  pdb_db_trim_buf (buf);
+  pdb_trim_buf (buf);
 
   /* If the <kap> tag contains variations then it will be a list with
    * commas in. The variations are ignored in the index text so it
