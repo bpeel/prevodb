@@ -1,6 +1,6 @@
 /*
  * PReVo - A portable version of ReVo for Android
- * Copyright (C) 2012  Neil Roberts
+ * Copyright (C) 2012, 2014  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -1535,7 +1535,8 @@ pdb_db_element_spans[] =
     },
     { .name = "em", .type = PDB_SPAN_BOLD, },
     { .name = "aut", .type = PDB_SPAN_NONE, .handler = pdb_db_handle_aut },
-    { .name = "uzo", .type = PDB_SPAN_NONE, .handler = pdb_db_handle_uzo }
+    { .name = "uzo", .type = PDB_SPAN_NONE, .handler = pdb_db_handle_uzo },
+    { .name = "trd", .type = PDB_SPAN_ITALIC, },
   };
 
 static gboolean
@@ -1545,8 +1546,7 @@ pdb_db_should_ignore_spannable_tag (PdbDocElementNode *element)
   if (!strcmp (element->name, "fnt") ||
       !strcmp (element->name, "adm") ||
       !strcmp (element->name, "bld") ||
-      /* Ignore translations. They are handled separately */
-      !strcmp (element->name, "trd") ||
+      /* Ignore translation groups. They are handled separately */
       !strcmp (element->name, "trdgrp"))
     return TRUE;
 
@@ -1570,6 +1570,21 @@ pdb_db_should_ignore_spannable_tag (PdbDocElementNode *element)
       return TRUE;
     }
  embedded_kap:
+
+  /* trd tags are handled separately unless they are a direct child of
+   * a definition. For example, in the article for ĉerizo the latin
+   * name for the fruit is mentioned directly in the article as a
+   * translation. In that case we do want to show the contents of the
+   * tag. This is also how the XSL templates for ReVo filter the
+   * tag. */
+  if (!strcmp (element->name, "trd"))
+    {
+      PdbDocElementNode *parent;
+
+      parent = (PdbDocElementNode *) element->node.parent;
+
+      return parent == NULL || strcmp (parent->name, "dif");
+    }
 
   return FALSE;
 }
