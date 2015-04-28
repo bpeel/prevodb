@@ -17,7 +17,7 @@ Kiel kompili la programon
 
 Unue oni devas kloni la deponejon jene:
 
- git clone git://git.busydoingnothing.co.uk/prevodb.git
+ git clone https://github.com/bpeel/prevodb.git
 
 PReVo uzas na autoconf same kiel multaj aliaj programoj. Tial oni
 povas simple kompili ĝin per la jenaj komandoj. Verŝajne vi volos
