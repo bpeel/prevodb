@@ -2,6 +2,10 @@ bin_PROGRAMS = \
 	prevodb \
 	prevo
 
+AM_CPPFLAGS = \
+	-DPREVO_LOCALEDIR=\""$(localedir)"\" \
+	$(NULL)
+
 INCLUDES = \
 	@GLIB_CFLAGS@ \
 	$(NULL)
