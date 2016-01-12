@@ -184,7 +184,7 @@ main (int argc, char **argv)
                pos < data + data_length;
                pos += article_length)
             {
-              if (article_length - (pos - data) < sizeof (guint32))
+              if (data_length - (pos - data) < sizeof (guint32))
                 {
                   dump_ret = FALSE;
                   break;
