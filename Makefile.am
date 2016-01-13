@@ -1,1 +1,3 @@
 SUBDIRS = po src
+
+EXTRA_DIST = README.md

@@ -13,22 +13,22 @@ La Reta Vortaro mem troviĝas ĉi tie:
  http://purl.org/net/voko/revo
 
 Kiel kompili la programon
-=========================
+-------------------------
 
 Unue oni devas kloni la deponejon jene:
 
- git clone https://github.com/bpeel/prevodb.git
+    git clone https://github.com/bpeel/prevodb.git
 
 PReVo uzas na autoconf same kiel multaj aliaj programoj. Tial oni
 povas simple kompili ĝin per la jenaj komandoj. Verŝajne vi volos
 instali ĝin al loko en via hejmdosiero, kaj tial vi povos uzi la
-agordilon ‘--prefix’:
+agordilon `--prefix`:
 
- ./autogen.sh --prefix=$HOME
- make -j
- make install
+    ./autogen.sh --prefix=$HOME
+    make -j
+    make install
 
-Nun la programo estas instalita ĉe $HOME/bin. Kutime tio estas en la
+Nun la programo estas instalita ĉe `$HOME/bin`. Kutime tio estas en la
 serĉvojo por programoj en normalaj instaloj de Linukso do vi povas
 simple tajpi na ‘prevo’ por startigi ĝin. Tamen unue oni bezonas la
 datumbazon. La pakaĵo inkluzivas duan programon por munti ĝin. Tio
@@ -39,46 +39,46 @@ tie:
 
 Elpaku tiun pakaĵon en unu dosieron:
 
- unzip revoxml_2012-09-30.zip
+    unzip revoxml_2012-09-30.zip
 
- Nun vi povas krei la datumbazon per la jenaj komandoj:
+Nun vi povas krei la datumbazon per la jenaj komandoj:
 
- mkdir -p ~/.local/share/prevo
- prevodb -s -i revo -o ~/.local/share/prevo/prevo.db
+    mkdir -p ~/.local/share/prevo
+    prevodb -s -i revo -o ~/.local/share/prevo/prevo.db
 
 Tio postulas iom da tempo kaj ĝi verŝajne plendos pri kelkaj eraroj.
 Tiuj kutime estas ignoreblaj.
 
-Nun vi povas serĉi en la vortaro per tajpi ‘prevo <vorto>’. Ekzemple:
+Nun vi povas serĉi en la vortaro per tajpi `prevo <vorto>`. Ekzemple:
 
- prevo terpomo
+    prevo terpomo
 
 Se vi volas serĉi en alia lingvo, vi povas unue tajpi la kodon por tiu
 lingvo. Ekzemple:
 
- prevo en potato
+    prevo en potato
 
 Kompletigo en Bash
-==================
+------------------
 
 PReVo ankaŭ subtenas kompletigon en Bash. Ekzemple vi povas tajpi nur
-‘prevo terp’ kaj premu na ‘tab’ dufoje kaj ĝi montros la liston de
+`prevo terp` kaj premu na ‘tab’ dufoje kaj ĝi montros la liston de
 kompletigoj:
 
- $ prevo terp<TAB><TAB>
- terparto      terpeno       terpomfingro  terpomujo
- terpeco       terpinto      terpomfloko   terpoto
- terpeĉo       terpiro       terpomo
+    $ prevo terp<TAB><TAB>
+    terparto      terpeno       terpomfingro  terpomujo
+    terpeco       terpinto      terpomfloko   terpoto
+    terpeĉo       terpiro       terpomo
 
 Por ebligi tion, oni devas unue inkluzivi unu dosieron en Bash. Tio
 eblas per:
 
- source src/prevo-completion
+    source src/prevo-completion
 
 Por ne devi tajpi tion ĉiufoje, vi povas kopii tiun skripton al
 malloka dosierujo ĉi tiel:
 
- sudo cp src/prevo-completion /etc/bash_completion.d/
+    sudo cp src/prevo-completion /etc/bash_completion.d/
 
 Tiel ĝi automate inkluzivos la kodon kiam oni ekkompletigas ion kio
-komenciĝas per ‘prevo’.
+komenciĝas per `prevo`.
