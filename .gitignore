@@ -16,8 +16,8 @@
 /install-sh
 /missing
 /mkinstalldirs
-!/autotools/as-linguas.m4
 /autotools/*.m4
+!/autotools/as-linguas.m4
 /src/Makefile
 /src/Makefile.in
 /src/prevodb
