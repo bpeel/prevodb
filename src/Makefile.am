@@ -12,6 +12,11 @@ AM_CFLAGS = \
 	$(WARNING_CFLAGS) \
 	$(NULL)
 
+completiondir = $(sysconfdir)/bash_completion.d
+dist_completion_DATA = \
+	prevo-completion
+	$(NULL)
+
 prevodb_SOURCES = \
 	main.c \
 	pdb-db.c \
