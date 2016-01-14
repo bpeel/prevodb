@@ -12,10 +12,6 @@ test -f src/main.c || {
 	exit 1
 }
 
-# GNU gettext automake support doesn't get along with git.
-# https://bugzilla.gnome.org/show_bug.cgi?id=661128
-touch -t 200001010000 po/prevo.pot
-
 AUTORECONF=`which autoreconf`
 if test -z $AUTORECONF; then
         echo "*** No autoreconf found, please install it ***"

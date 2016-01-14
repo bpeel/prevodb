@@ -18,7 +18,7 @@ GETTEXT_PACKAGE=prevo
 AC_SUBST(GETTEXT_PACKAGE)
 AC_DEFINE_UNQUOTED(GETTEXT_PACKAGE, "$GETTEXT_PACKAGE",
                    [The gettext package name])
-AM_GNU_GETTEXT_VERSION([0.17])
+AM_GNU_GETTEXT_VERSION([0.19])
 AM_GNU_GETTEXT([external])
 
 CFLAGS="$CFLAGS -Wcast-align -Wuninitialized -Wno-strict-aliasing -Wempty-body -Wformat -Wformat-security -Winit-self -Wvla -Wpointer-arith -Wmissing-declarations -Wdeclaration-after-statement"
