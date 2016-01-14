@@ -4,9 +4,6 @@ bin_PROGRAMS = \
 
 AM_CPPFLAGS = \
 	-DPREVO_LOCALEDIR=\""$(localedir)"\" \
-	$(NULL)
-
-INCLUDES = \
 	$(GLIB_CFLAGS) \
 	$(EXPAT_CFLAGS) \
 	$(NULL)
