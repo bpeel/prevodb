@@ -1,6 +1,6 @@
 /*
  * PReVo - A portable version of ReVo for Android
- * Copyright (C) 2012, 2014  Neil Roberts
+ * Copyright (C) 2012, 2014, 2016  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -2068,6 +2068,37 @@ pdb_db_parse_subart (PdbDb *db,
   return TRUE;
 }
 
+static gboolean
+pdb_db_parse_toplevel_dif (PdbDb *db,
+                           PdbDbArticle *article,
+                           PdbDocElementNode *root_node,
+                           GQueue *sections,
+                           GError **error)
+{
+  PdbDbSection *section;
+
+  section = pdb_db_section_new ("eo");
+
+  section->title.text = g_strdup ("Resumo");
+  section->title.length = strlen (section->title.text);
+  pdb_list_init (&section->title.spans);
+
+  /* The toplevel definition should directly be a spannable string */
+  if (!pdb_db_parse_spannable_string (db,
+                                      (PdbDocElementNode *) root_node,
+                                      &section->text,
+                                      error))
+    {
+      pdb_db_destroy_spannable_string (&section->title);
+      g_slice_free (PdbDbSection, section);
+      return FALSE;
+    }
+
+  g_queue_push_tail (sections, section);
+
+  return TRUE;
+}
+
 static PdbDbArticle *
 pdb_db_parse_article (PdbDb *db,
                       PdbDocElementNode *root_node,
@@ -2133,6 +2164,18 @@ pdb_db_parse_article (PdbDb *db,
                                           element,
                                           &sections,
                                           error))
+                  {
+                    result = FALSE;
+                    break;
+                  }
+              }
+            else if (!strcmp (element->name, "dif"))
+              {
+                if (!pdb_db_parse_toplevel_dif (db,
+                                                article,
+                                                element,
+                                                &sections,
+                                                error))
                   {
                     result = FALSE;
                     break;
