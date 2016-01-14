@@ -8,6 +8,7 @@ AM_CPPFLAGS = \
 
 INCLUDES = \
 	@GLIB_CFLAGS@ \
+	@EXPAT_CFLAGS@ \
 	$(NULL)
 
 prevodb_SOURCES = \
@@ -43,8 +44,8 @@ prevodb_SOURCES = \
 	$(NULL)
 
 prevodb_LDADD = \
-	-lexpat \
 	@GLIB_LIBS@ \
+	@EXPAT_LIBS@ \
 	$(NULL)
 
 prevo_SOURCES = \
@@ -94,7 +95,7 @@ test_doc_SOURCES = \
 
 test_doc_LDADD = \
 	@GLIB_LIBS@ \
-	-lexpat \
+	@EXPAT_LIBS@ \
 	$(NULL)
 
 dump_marks_SOURCES = \
@@ -106,5 +107,5 @@ dump_marks_SOURCES = \
 
 dump_marks_LDADD = \
 	@GLIB_LIBS@ \
-	-lexpat \
+	@EXPAT_LIBS@ \
 	$(NULL)
