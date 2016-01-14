@@ -7,8 +7,8 @@ AM_CPPFLAGS = \
 	$(NULL)
 
 INCLUDES = \
-	@GLIB_CFLAGS@ \
-	@EXPAT_CFLAGS@ \
+	$(GLIB_CFLAGS) \
+	$(EXPAT_CFLAGS) \
 	$(NULL)
 
 prevodb_SOURCES = \
@@ -44,8 +44,8 @@ prevodb_SOURCES = \
 	$(NULL)
 
 prevodb_LDADD = \
-	@GLIB_LIBS@ \
-	@EXPAT_LIBS@ \
+	$(GLIB_LIBS) \
+	$(EXPAT_LIBS) \
 	$(NULL)
 
 prevo_SOURCES = \
@@ -60,7 +60,7 @@ prevo_SOURCES = \
 	prevo.c
 
 prevo_LDADD = \
-	@GLIB_LIBS@ \
+	$(GLIB_LIBS) \
 	$(NULL)
 
 noinst_PROGRAMS = \
@@ -74,7 +74,7 @@ dump_index_SOURCES = \
 	dump-index.c
 
 dump_index_LDADD = \
-	@GLIB_LIBS@ \
+	$(GLIB_LIBS) \
 	$(NULL)
 
 dump_article_SOURCES = \
@@ -82,7 +82,7 @@ dump_article_SOURCES = \
 	$(NULL)
 
 dump_article_LDADD = \
-	@GLIB_LIBS@ \
+	$(GLIB_LIBS) \
 	$(NULL)
 
 test_doc_SOURCES = \
@@ -94,8 +94,8 @@ test_doc_SOURCES = \
 	$(NULL)
 
 test_doc_LDADD = \
-	@GLIB_LIBS@ \
-	@EXPAT_LIBS@ \
+	$(GLIB_LIBS) \
+	$(EXPAT_LIBS) \
 	$(NULL)
 
 dump_marks_SOURCES = \
@@ -106,6 +106,6 @@ dump_marks_SOURCES = \
 	$(NULL)
 
 dump_marks_LDADD = \
-	@GLIB_LIBS@ \
-	@EXPAT_LIBS@ \
+	$(GLIB_LIBS) \
+	$(EXPAT_LIBS) \
 	$(NULL)
