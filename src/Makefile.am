@@ -8,6 +8,10 @@ AM_CPPFLAGS = \
 	$(EXPAT_CFLAGS) \
 	$(NULL)
 
+AM_CFLAGS = \
+	$(WARNING_CFLAGS) \
+	$(NULL)
+
 prevodb_SOURCES = \
 	main.c \
 	pdb-db.c \

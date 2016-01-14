@@ -18,6 +18,7 @@
 /mkinstalldirs
 /autotools/*.m4
 !/autotools/as-linguas.m4
+!/autotools/as-compiler-flag.m4
 /src/Makefile
 /src/Makefile.in
 /src/prevodb
