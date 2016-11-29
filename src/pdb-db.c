@@ -2327,6 +2327,7 @@ pdb_db_new (PdbRevo *revo,
 {
   PdbDb *db;
   char **files;
+  GError *tmp_error;
 
   db = g_slice_new (PdbDb);
 
@@ -2410,6 +2411,18 @@ pdb_db_new (PdbRevo *revo,
                 {
                   pdb_db_free (db);
                   db = NULL;
+
+                  /* Add the filename into the error message */
+                  if (error && *error && (*error)->domain == PDB_ERROR)
+                    {
+                      tmp_error = g_error_new ((*error)->domain,
+                                               (*error)->code,
+                                               "%s: %s",
+                                               file,
+                                               (*error)->message);
+                      g_error_free (*error);
+                      *error = tmp_error;
+                    }
                   break;
                 }
             }
