@@ -1,6 +1,6 @@
 /*
  * PReVo - A portable version of ReVo for Android
- * Copyright (C) 2012, 2014, 2016  Neil Roberts
+ * Copyright (C) 2012, 2014, 2016, 2017  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -844,10 +844,11 @@ pdb_db_handle_translation (PdbDb *db,
 }
 
 static gboolean
-pdb_db_find_translations_recursive (PdbDb *db,
-                                    PdbDocElementNode *root_node,
-                                    const PdbDbReference *reference,
-                                    GError **error)
+pdb_db_find_translations_recursive_skip (PdbDb *db,
+                                         PdbDocElementNode *root_node,
+                                         const char *skip,
+                                         const PdbDbReference *reference,
+                                         GError **error)
 {
   GPtrArray *stack;
   gboolean ret = TRUE;
@@ -893,7 +894,8 @@ pdb_db_find_translations_recursive (PdbDb *db,
                    strcmp (element->name, "ekz") &&
                    strcmp (element->name, "bld") &&
                    strcmp (element->name, "adm") &&
-                   strcmp (element->name, "fnt"))
+                   strcmp (element->name, "fnt") &&
+                   (skip == NULL || strcmp (element->name, skip)))
             g_ptr_array_add (stack, node->first_child);
 
           if (reference->type == PDB_DB_REFERENCE_TYPE_DIRECT &&
@@ -908,6 +910,19 @@ pdb_db_find_translations_recursive (PdbDb *db,
   g_ptr_array_free (stack, TRUE);
 
   return ret;
+}
+
+static gboolean
+pdb_db_find_translations_recursive (PdbDb *db,
+                                    PdbDocElementNode *root_node,
+                                    const PdbDbReference *reference,
+                                    GError **error)
+{
+  return pdb_db_find_translations_recursive_skip (db,
+                                                  root_node,
+                                                  NULL, /* skip */
+                                                  reference,
+                                                  error);
 }
 
 static gboolean
@@ -1693,10 +1708,11 @@ pdb_db_parse_node (PdbDb *db,
 }
 
 static gboolean
-pdb_db_parse_spannable_string (PdbDb *db,
-                               PdbDocElementNode *root_element,
-                               PdbDbSpannableString *string,
-                               GError **error)
+pdb_db_parse_spannable_string_upto (PdbDb *db,
+                                    PdbDocElementNode *root_element,
+                                    PdbDocNode *upto,
+                                    PdbDbSpannableString *string,
+                                    GError **error)
 {
   PdbDbParseState state;
 
@@ -1732,12 +1748,15 @@ pdb_db_parse_spannable_string (PdbDb *db,
           break;
 
         case PDB_DB_STACK_NODE:
+          if (this_entry.d.node == upto)
+            goto done;
           if (!pdb_db_parse_node (db, &state, this_entry.d.node, error))
             goto error;
           break;
         }
     }
 
+ done:
   string->length = state.buf->len;
   string->text = g_string_free (state.buf, FALSE);
   pdb_list_init (&string->spans);
@@ -1753,6 +1772,19 @@ pdb_db_parse_spannable_string (PdbDb *db,
   pdb_span_free_list (&state.spans);
 
   return FALSE;
+}
+
+static gboolean
+pdb_db_parse_spannable_string (PdbDb *db,
+                               PdbDocElementNode *root_element,
+                               PdbDbSpannableString *string,
+                               GError **error)
+{
+  return pdb_db_parse_spannable_string_upto (db,
+                                             root_element,
+                                             NULL, /* upto */
+                                             string,
+                                             error);
 }
 
 static void
@@ -1947,106 +1979,13 @@ pdb_db_parse_subart (PdbDb *db,
   ref.d.direct.article = article;
   ref.d.direct.section = section;
 
-  /* Let's assume the sub-article will either be a collection of
-   * <drv>s or directly a spannable string, not a mix */
-  if ((drv = pdb_doc_get_child_element (&root_node->node, "drv")))
-    {
-      /* The first child can optionally be the definition */
-      for (node = root_node->node.first_child;
-           node && node->type == PDB_DOC_NODE_TYPE_TEXT;
-           node = node->next);
+  /* The subart is assumed to be a spannable string followed by a list
+   * of zero or more <drv>s */
+  drv = pdb_doc_get_child_element (&root_node->node, "drv");
 
-      if (node &&
-          node->type == PDB_DOC_NODE_TYPE_ELEMENT &&
-          !strcmp (((PdbDocElementNode *) node)->name, "dif"))
-        {
-          if (!pdb_db_parse_spannable_string (db,
-                                              (PdbDocElementNode *) node,
-                                              &section->text,
-                                              error))
-            {
-              pdb_db_destroy_spannable_string (&section->title);
-              g_slice_free (PdbDbSection, section);
-              return FALSE;
-            }
-
-          if (!pdb_db_find_translations_recursive (db,
-                                                   (PdbDocElementNode *) node,
-                                                   &ref,
-                                                   error))
-            return FALSE;
-
-          node = node->next;
-        }
-      else
-        {
-          section->text.length = 0;
-          section->text.text = g_strdup ("");
-          pdb_list_init (&section->text.spans);
-        }
-
-      g_queue_push_tail (sections, section);
-
-      if (!pdb_db_find_translations (db,
-                                     root_node,
-                                     &ref,
-                                     error))
-        return FALSE;
-
-      for (; node; node = node->next)
-        switch (node->type)
-          {
-          case PDB_DOC_NODE_TYPE_ELEMENT:
-            {
-              PdbDocElementNode *element = (PdbDocElementNode *) node;
-
-              if (!strcmp (element->name, "drv"))
-                {
-                  if (!pdb_db_add_drv (db,
-                                       article,
-                                       element,
-                                       sections,
-                                       error))
-                    return FALSE;
-                }
-              else if (strcmp (element->name, "adm") &&
-                       strcmp (element->name, "trd") &&
-                       strcmp (element->name, "trdgrp") &&
-                       /* FIXME - this probably shouldn't strip out
-                        * <rim> tags here */
-                       strcmp (element->name, "rim"))
-                {
-                  g_set_error (error,
-                               PDB_ERROR,
-                               PDB_ERROR_BAD_FORMAT,
-                               _("<%s> tag found in <subart> that has a <drv>"),
-                               element->name);
-                  return FALSE;
-                }
-            }
-            break;
-
-          case PDB_DOC_NODE_TYPE_TEXT:
-            {
-              PdbDocTextNode *text = (PdbDocTextNode *) node;
-              int i;
-
-              for (i = 0; i < text->len; i++)
-                if (!g_ascii_isspace (text->data[i]))
-                  {
-                    g_set_error (error,
-                                 PDB_ERROR,
-                                 PDB_ERROR_BAD_FORMAT,
-                                 _("Unexpected bare text in <subart> that "
-                                   "has a <drv>"));
-                    return FALSE;
-                  }
-            }
-            break;
-          }
-    }
-  else if (!pdb_db_parse_spannable_string (db,
+  if (!pdb_db_parse_spannable_string_upto (db,
                                            root_node,
+                                           &drv->node, /* upto */
                                            &section->text,
                                            error))
     {
@@ -2054,16 +1993,67 @@ pdb_db_parse_subart (PdbDb *db,
       g_slice_free (PdbDbSection, section);
       return FALSE;
     }
-  else
-    {
-      g_queue_push_tail (sections, section);
 
-      if (!pdb_db_find_translations_recursive (db,
-                                               root_node,
-                                               &ref,
-                                               error))
-        return FALSE;
-    }
+  g_queue_push_tail (sections, section);
+
+  if (!pdb_db_find_translations_recursive_skip (db,
+                                                root_node,
+                                                "drv",
+                                                &ref,
+                                                error))
+    return FALSE;
+
+  for (node = &drv->node; node; node = node->next)
+    switch (node->type)
+      {
+      case PDB_DOC_NODE_TYPE_ELEMENT:
+        {
+          PdbDocElementNode *element = (PdbDocElementNode *) node;
+
+          if (!strcmp (element->name, "drv"))
+            {
+              if (!pdb_db_add_drv (db,
+                                   article,
+                                   element,
+                                   sections,
+                                   error))
+                return FALSE;
+            }
+          else if (strcmp (element->name, "adm") &&
+                   strcmp (element->name, "trd") &&
+                   strcmp (element->name, "trdgrp") &&
+                   /* FIXME - this probably shouldn't strip out
+                    * <rim> tags here */
+                   strcmp (element->name, "rim"))
+            {
+              g_set_error (error,
+                           PDB_ERROR,
+                           PDB_ERROR_BAD_FORMAT,
+                           _("<%s> tag found in <subart> that has a <drv>"),
+                           element->name);
+              return FALSE;
+            }
+        }
+        break;
+
+      case PDB_DOC_NODE_TYPE_TEXT:
+        {
+          PdbDocTextNode *text = (PdbDocTextNode *) node;
+          int i;
+
+          for (i = 0; i < text->len; i++)
+            if (!g_ascii_isspace (text->data[i]))
+              {
+                g_set_error (error,
+                             PDB_ERROR,
+                             PDB_ERROR_BAD_FORMAT,
+                             _("Unexpected bare text in <subart> that "
+                               "has a <drv>"));
+                return FALSE;
+              }
+        }
+        break;
+      }
 
   return TRUE;
 }
