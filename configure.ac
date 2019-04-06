@@ -23,8 +23,7 @@ AM_GNU_GETTEXT([external])
 
 ALL_WARNING_CFLAGS="-Wall -Wuninitialized -Wempty-body -Wformat
                     -Wformat-security -Winit-self -Wundef
-                    -Wdeclaration-after-statement -Wvla
-                    -Wpointer-arith -Wmissing-declarations
+                    -Wvla -Wpointer-arith -Wmissing-declarations
                     -Wcast-align -Wno-strict-aliasing"
 AS_COMPILER_FLAGS([WARNING_CFLAGS],
                   [$ALL_WARNING_CFLAGS])
