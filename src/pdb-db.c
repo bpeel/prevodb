@@ -180,6 +180,9 @@ typedef struct
 {
   PdbDbArticle *article;
   PdbDbSection *section;
+  /* If the mark is in a particular sence then this will be the sence
+   * number. Otherwise it will be -1. */
+  int sence;
 } PdbDbMark;
 
 struct _PdbDb
@@ -455,7 +458,7 @@ pdb_db_get_element_num (PdbDocElementNode *element)
     return num;
 }
 
-static void
+static PdbDbMark *
 pdb_db_add_mark (PdbDb *db,
                  PdbDbArticle *article,
                  PdbDbSection *section,
@@ -465,10 +468,62 @@ pdb_db_add_mark (PdbDb *db,
 
   mark->article = article;
   mark->section = section;
+  mark->sence = -1;
 
   g_hash_table_insert (db->marks,
                        g_strdup (mark_name),
                        mark);
+
+  return mark;
+}
+
+static int
+pdb_db_get_sence_number (const PdbDocElementNode *elem)
+{
+  /* Look for a containing “snc” element */
+  while (elem && elem->node.type == PDB_DOC_NODE_TYPE_ELEMENT)
+    {
+      if (!strcmp (elem->name, "snc"))
+        {
+          int sence_num = 1;
+
+          /* Count the previous sences */
+          for (PdbDocNode *node = elem->node.prev; node; node = node->prev)
+            {
+              if (node->type == PDB_DOC_NODE_TYPE_ELEMENT &&
+                  !strcmp (((PdbDocElementNode *) node)->name, "snc"))
+                sence_num++;
+            }
+
+          return sence_num;
+        }
+
+      elem = (PdbDocElementNode *) elem->node.parent;
+    }
+
+  return -1;
+}
+
+static void
+pdb_db_add_mark_from_element_to_reference (PdbDb *db,
+                                           const PdbDbReference *reference,
+                                           PdbDocElementNode *elem)
+{
+  /* Only add marks to direct references */
+  if (reference->type != PDB_DB_REFERENCE_TYPE_DIRECT)
+    return;
+
+  const char *mrk = pdb_doc_get_attribute (elem, "mrk");
+
+  if (mrk == NULL)
+    return;
+
+  PdbDbMark *mark = pdb_db_add_mark (db,
+                                     reference->d.direct.article,
+                                     reference->d.direct.section,
+                                     mrk);
+
+  mark->sence = pdb_db_get_sence_number (elem);
 }
 
 typedef struct
@@ -852,14 +907,8 @@ pdb_db_find_translations_recursive_skip (PdbDb *db,
 {
   GPtrArray *stack;
   gboolean ret = TRUE;
-  const char *mrk;
 
-  if (reference->type == PDB_DB_REFERENCE_TYPE_DIRECT &&
-      (mrk = pdb_doc_get_attribute (root_node, "mrk")))
-    pdb_db_add_mark (db,
-                     reference->d.direct.article,
-                     reference->d.direct.section,
-                     mrk);
+  pdb_db_add_mark_from_element_to_reference (db, reference, root_node);
 
   stack = g_ptr_array_new ();
 
@@ -898,12 +947,7 @@ pdb_db_find_translations_recursive_skip (PdbDb *db,
                    (skip == NULL || strcmp (element->name, skip)))
             g_ptr_array_add (stack, node->first_child);
 
-          if (reference->type == PDB_DB_REFERENCE_TYPE_DIRECT &&
-              (mrk = pdb_doc_get_attribute (element, "mrk")))
-            pdb_db_add_mark (db,
-                             reference->d.direct.article,
-                             reference->d.direct.section,
-                             mrk);
+          pdb_db_add_mark_from_element_to_reference (db, reference, element);
         }
     }
 
@@ -933,14 +977,8 @@ pdb_db_find_translations (PdbDb *db,
 {
   PdbDocNode *node;
   gboolean ret = TRUE;
-  const char *mrk;
 
-  if (reference->type == PDB_DB_REFERENCE_TYPE_DIRECT &&
-      (mrk = pdb_doc_get_attribute (root_node, "mrk")))
-    pdb_db_add_mark (db,
-                     reference->d.direct.article,
-                     reference->d.direct.section,
-                     mrk);
+  pdb_db_add_mark_from_element_to_reference (db, reference, root_node);
 
   for (node = root_node->node.first_child; node; node = node->next)
     if (node->type == PDB_DOC_NODE_TYPE_ELEMENT)
