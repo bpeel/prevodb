@@ -19,10 +19,10 @@ Unue oni devas kloni la deponejon jene:
 
     git clone https://github.com/bpeel/prevodb.git
 
-PReVo uzas na autoconf same kiel multaj aliaj programoj. Tial oni
-povas simple kompili ĝin per la jenaj komandoj. Verŝajne vi volos
-instali ĝin al loko en via hejmdosiero, kaj tial vi povos uzi la
-agordilon `--prefix`:
+PReVo uzas autoconf same kiel multaj aliaj programoj. Tial oni povas
+simple kompili ĝin per la jenaj komandoj. Verŝajne vi volos instali
+ĝin al loko en via hejmdosiero, kaj tial vi povos uzi la agordilon
+`--prefix`:
 
     ./autogen.sh --prefix=$HOME
     make -j
@@ -30,7 +30,7 @@ agordilon `--prefix`:
 
 Nun la programo estas instalita ĉe `$HOME/bin`. Kutime tio estas en la
 serĉvojo por programoj en normalaj instaloj de Linukso do vi povas
-simple tajpi na ‘prevo’ por startigi ĝin. Tamen unue oni bezonas la
+simple tajpi ‘prevo’ por startigi ĝin. Tamen unue oni bezonas la
 datumbazon. La pakaĵo inkluzivas duan programon por munti ĝin. Tio
 bezonas la fontodosierojn de la Reta Vortaro. Vi povas trovi tiujn ĉi
 tie:
@@ -49,7 +49,7 @@ Nun vi povas krei la datumbazon per la jenaj komandoj:
 Tio postulas iom da tempo kaj ĝi verŝajne plendos pri kelkaj eraroj.
 Tiuj kutime estas ignoreblaj.
 
-Nun vi povas serĉi en la vortaro per tajpi `prevo <vorto>`. Ekzemple:
+Nun vi povas serĉi en la vortaro tajpante `prevo <vorto>`. Ekzemple:
 
     prevo terpomo
 
@@ -62,7 +62,7 @@ Kompletigo en Bash
 ------------------
 
 PReVo ankaŭ subtenas kompletigon en Bash. Ekzemple vi povas tajpi nur
-`prevo terp` kaj premu na ‘tab’ dufoje kaj ĝi montros la liston de
+`prevo terp` kaj premi ‘tab’ dufoje kaj ĝi montros la liston de
 kompletigoj:
 
     $ prevo terp<TAB><TAB>
