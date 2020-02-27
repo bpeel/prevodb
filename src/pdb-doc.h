@@ -86,7 +86,7 @@ gboolean
 pdb_doc_element_has_child_element (PdbDocElementNode *element);
 
 const char *
-pdb_doc_get_attribute (PdbDocElementNode *element,
+pdb_doc_get_attribute (const PdbDocElementNode *element,
                        const char *attr_name);
 
 #endif /* PDB_DOC_H */

@@ -380,12 +380,10 @@ pdb_doc_element_has_child_element (PdbDocElementNode *element)
 }
 
 const char *
-pdb_doc_get_attribute (PdbDocElementNode *element,
+pdb_doc_get_attribute (const PdbDocElementNode *element,
                        const char *attr_name)
 {
-  char **att;
-
-  for (att = element->atts; att[0]; att += 2)
+  for (char * const *att = element->atts; att[0]; att += 2)
     if (!strcmp (att[0], attr_name))
       return att[1];
 
