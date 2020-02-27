@@ -1136,11 +1136,10 @@ pdb_db_resolve_reference (PdbDb *db,
 
 static void
 pdb_db_set_sncref (PdbDb *db,
+                   PdbDbLink *link,
                    int article_num,
                    int section_num,
-                   int sence_num,
-                   PdbDbSpannableString *string,
-                   PdbSpan *span)
+                   int sence_num)
 {
   g_assert (article_num < db->articles->len);
 
@@ -1149,23 +1148,33 @@ pdb_db_set_sncref (PdbDb *db,
 
   g_assert (section != NULL);
 
-  if (sence_num < 0 || string == NULL)
+  if (sence_num < 0 || link->string == NULL)
     {
-      fprintf (stderr,
-               _("reference to section with title “%.*s” "
-                 "contains an invalid sncref\n"),
-               section->title.length,
-               section->title.text);
-      pdb_list_remove (&span->link);
-      pdb_span_free (span);
+      if (link->reference->type == PDB_DB_REFERENCE_TYPE_MARK)
+        {
+          fprintf (stderr,
+                   _("sncref “%s” doesn’t point to a snc\n"),
+                   link->reference->d.mark);
+        }
+      else
+        {
+          fprintf (stderr,
+                   _("reference to section with title “%.*s” "
+                     "contains an invalid sncref\n"),
+                   section->title.length,
+                   section->title.text);
+        }
+      pdb_list_remove (&link->span->link);
+      pdb_span_free (link->span);
       return;
     }
 
   char buf[16];
-
   snprintf (buf, sizeof buf, "%i", sence_num);
-
   int len = strlen (buf);
+
+  PdbDbSpannableString *string = link->string;
+  PdbSpan *span = link->span;
   char *rep_text = g_malloc (string->length + len + 1);
   memcpy (rep_text, string->text, span->span_start);
   memcpy (rep_text + span->span_start, buf, len);
@@ -1227,11 +1236,10 @@ pdb_db_resolve_links (PdbDb *db)
           if (link->span->type == PDB_SPAN_SUPERSCRIPT)
             {
               pdb_db_set_sncref (db,
+                                 link,
                                  article_num,
                                  section_num,
-                                 sence_num,
-                                 link->string,
-                                 link->span);
+                                 sence_num);
             }
           else
             {
