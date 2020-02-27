@@ -169,6 +169,7 @@ typedef struct
  * can be resolved later once all of the articles are loaded */
 typedef struct
 {
+  PdbDbSpannableString *string;
   PdbSpan *span;
   PdbDbReference *reference;
 } PdbDbLink;
@@ -684,6 +685,7 @@ pdb_db_get_trd_link (PdbDb *db,
   link = g_slice_new (PdbDbLink);
   link->span = span;
   link->reference = pdb_db_reference_copy (reference);
+  link->string = NULL;
 
   db->links = g_list_prepend (db->links, link);
 
@@ -1064,7 +1066,8 @@ static gboolean
 pdb_db_resolve_reference (PdbDb *db,
                           const PdbDbReference *ref,
                           int *article_num,
-                          int *section_num)
+                          int *section_num,
+                          int *sence_num)
 {
   gboolean ret = TRUE;
 
@@ -1104,11 +1107,13 @@ pdb_db_resolve_reference (PdbDb *db,
           {
             *article_num = mark->article->article_num;
             *section_num = mark->section->section_num;
+            *sence_num = mark->sence;
           }
         else
           {
             *article_num = 0;
             *section_num = 0;
+            *sence_num = -1;
             fprintf (stderr,
                      _("no mark found for reference \"%s\"\n"),
                      ref->d.mark);
@@ -1121,11 +1126,68 @@ pdb_db_resolve_reference (PdbDb *db,
       {
         *article_num = ref->d.direct.article->article_num;
         *section_num = ref->d.direct.section->section_num;
+        *sence_num = -1;
       }
       break;
     }
 
   return ret;
+}
+
+static void
+pdb_db_set_sncref (PdbDb *db,
+                   int article_num,
+                   int section_num,
+                   int sence_num,
+                   PdbDbSpannableString *string,
+                   PdbSpan *span)
+{
+  g_assert (article_num < db->articles->len);
+
+  PdbDbArticle *article = db->articles->pdata[article_num];
+  PdbDbSection *section = g_list_nth_data (article->sections, section_num);
+
+  g_assert (section != NULL);
+
+  if (sence_num < 0 || string == NULL)
+    {
+      fprintf (stderr,
+               _("reference to section with title “%.*s” "
+                 "contains an invalid sncref\n"),
+               section->title.length,
+               section->title.text);
+      pdb_list_remove (&span->link);
+      pdb_span_free (span);
+      return;
+    }
+
+  char buf[16];
+
+  snprintf (buf, sizeof buf, "%i", sence_num);
+
+  int len = strlen (buf);
+  char *rep_text = g_malloc (string->length + len + 1);
+  memcpy (rep_text, string->text, span->span_start);
+  memcpy (rep_text + span->span_start, buf, len);
+  memcpy (rep_text + span->span_start + len,
+          string->text + span->span_start,
+          string->length - span->span_start);
+  rep_text[string->length + len] = '\0';
+  g_free (string->text);
+  string->text = rep_text;
+  string->length += len;
+  span->span_length += len;
+
+  PdbSpan *s;
+
+  pdb_list_for_each (s, &string->spans, link)
+    {
+      if (s == span)
+        continue;
+
+      if (s->span_start > span->span_start)
+        s->span_start += len;
+    }
 }
 
 static void
@@ -1154,15 +1216,28 @@ pdb_db_resolve_links (PdbDb *db)
   for (l = db->links; l; l = l->next)
     {
       PdbDbLink *link = l->data;
-      int article_num, section_num;
+      int article_num, section_num, sence_num;
 
       if (pdb_db_resolve_reference (db,
                                     link->reference,
                                     &article_num,
-                                    &section_num))
+                                    &section_num,
+                                    &sence_num))
         {
-          link->span->data1 = article_num;
-          link->span->data2 = section_num;
+          if (link->span->type == PDB_SPAN_SUPERSCRIPT)
+            {
+              pdb_db_set_sncref (db,
+                                 article_num,
+                                 section_num,
+                                 sence_num,
+                                 link->string,
+                                 link->span);
+            }
+          else
+            {
+              link->span->data1 = article_num;
+              link->span->data2 = section_num;
+            }
         }
       else
         {
@@ -1199,6 +1274,7 @@ typedef struct
 {
   GArray *stack;
   GString *buf;
+  PdbDbSpannableString *string;
   PdbList spans;
   gboolean paragraph_queued;
   gboolean skip_children;
@@ -1405,6 +1481,26 @@ pdb_db_handle_reference_type (PdbDbParseState *state,
       }
 }
 
+static void
+pdb_db_add_reference_span (PdbDb *db,
+                           PdbDbParseState *state,
+                           PdbSpanType span_type,
+                           const char *mrk)
+{
+  PdbSpan *span = pdb_db_start_span (state, span_type);
+
+  PdbDbLink *link = g_slice_new (PdbDbLink);
+  link->span = span;
+  link->string = state->string;
+
+  PdbDbReference *reference = g_slice_new (PdbDbReference);
+  reference->type = PDB_DB_REFERENCE_TYPE_MARK;
+  reference->d.mark = g_strdup (mrk);
+  link->reference = reference;
+
+  db->links = g_list_prepend (db->links, link);
+}
+
 static gboolean
 pdb_db_handle_ref (PdbDb *db,
                    PdbDbParseState *state,
@@ -1412,8 +1508,6 @@ pdb_db_handle_ref (PdbDb *db,
                    PdbSpan *span,
                    GError **error)
 {
-  PdbDbReference *reference;
-  PdbDbLink *link;
   char **att;
 
   for (att = element->atts; att[0]; att += 2)
@@ -1430,17 +1524,7 @@ pdb_db_handle_ref (PdbDb *db,
 
   pdb_db_handle_reference_type (state, element);
 
-  span = pdb_db_start_span (state, PDB_SPAN_REFERENCE);
-
-  link = g_slice_new (PdbDbLink);
-  link->span = span;
-
-  reference = g_slice_new (PdbDbReference);
-  reference->type = PDB_DB_REFERENCE_TYPE_MARK;
-  reference->d.mark = g_strdup (att[1]);
-  link->reference = reference;
-
-  db->links = g_list_prepend (db->links, link);
+  pdb_db_add_reference_span (db, state, PDB_SPAN_REFERENCE, att[1]);
 
   return TRUE;
 }
@@ -1453,6 +1537,51 @@ pdb_db_handle_refgrp (PdbDb *db,
                       GError **error)
 {
   pdb_db_handle_reference_type (state, element);
+
+  return TRUE;
+}
+
+static const char *
+pdb_db_get_sncref_ref (const PdbDocElementNode *element)
+{
+  const char *ref = pdb_doc_get_attribute (element, "ref");
+
+  if (ref != NULL)
+    return ref;
+
+  /* Instead of specifying the target as an attribute, the sncref tag
+   * can also be a child of a <ref> tag. */
+
+  if (element->node.parent == NULL)
+    return NULL;
+
+  PdbDocElementNode *parent = (PdbDocElementNode *) element->node.parent;
+
+  if (strcmp (parent->name, "ref"))
+    return NULL;
+
+  return pdb_doc_get_attribute (parent, "cel");
+}
+
+static gboolean
+pdb_db_handle_sncref (PdbDb *db,
+                      PdbDbParseState *state,
+                      PdbDocElementNode *element,
+                      GError **error)
+{
+  const char *ref = pdb_db_get_sncref_ref (element);
+
+  if (ref == NULL)
+    {
+      g_set_error (error,
+                   PDB_ERROR,
+                   PDB_ERROR_BAD_FORMAT,
+                   _("<sncref> tag found with a target"));
+      return FALSE;
+    }
+
+  pdb_db_start_text (state);
+  pdb_db_add_reference_span (db, state, PDB_SPAN_SUPERSCRIPT, ref);
 
   return TRUE;
 }
@@ -1713,6 +1842,14 @@ pdb_db_parse_node (PdbDb *db,
               pdb_db_parse_push_node (state,
                                       element->node.first_child);
           }
+        else if (!strcmp (element->name, "sncref"))
+          {
+            if (!pdb_db_handle_sncref (db,
+                                       state,
+                                       element,
+                                       error))
+              return FALSE;
+          }
       }
       break;
 
@@ -1757,6 +1894,7 @@ pdb_db_parse_spannable_string_upto (PdbDb *db,
   state.stack = g_array_new (FALSE, FALSE, sizeof (PdbDbParseStackEntry));
   state.buf = g_string_new (NULL);
   state.paragraph_queued = FALSE;
+  state.string = string;
 
   pdb_list_init (&state.spans);
 
@@ -2318,11 +2456,13 @@ pdb_db_get_reference_cb (void *data,
 {
   PdbDb *db = user_data;
   PdbDbReference *ref = data;
+  int sence_num;
 
   pdb_db_resolve_reference (db,
                             ref,
                             article_num,
-                            mark_num);
+                            mark_num,
+                            &sence_num);
 }
 
 static void
