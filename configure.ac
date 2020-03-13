@@ -1,4 +1,4 @@
-AC_INIT([prevodb], 0.2)
+AC_INIT([prevodb], 0.3)
 
 AM_CONFIG_HEADER([config.h])
 
