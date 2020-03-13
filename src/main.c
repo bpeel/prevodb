@@ -25,6 +25,7 @@
 #include "pdb-db.h"
 
 static gboolean option_single = FALSE;
+static gboolean option_version = FALSE;
 static const char *option_in_file = NULL;
 static const char *option_out_file = NULL;
 
@@ -42,6 +43,10 @@ options[] =
     {
       "out", 'o', 0, G_OPTION_ARG_STRING, &option_out_file,
       N_("Location for the output of the database"), NULL
+    },
+    {
+      "version", 0, 0, G_OPTION_ARG_NONE, &option_version,
+      N_("Show version information and exit"), NULL
     },
     { NULL, 0, 0, 0, NULL, NULL, NULL }
   };
@@ -67,6 +72,12 @@ process_arguments (int *argc, char ***argv,
   g_option_context_set_main_group (context, group);
   ret = g_option_context_parse (context, argc, argv, error);
   g_option_context_free (context);
+
+  if (option_version)
+    {
+      fprintf (stderr, "prevodb " VERSION "\n");
+      exit (0);
+    }
 
   if (ret)
     {

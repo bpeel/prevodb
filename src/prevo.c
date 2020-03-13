@@ -51,6 +51,7 @@ static const char *option_language = NULL;
 static const char *option_word = NULL;
 static gboolean option_raw = FALSE;
 static gboolean option_complete = FALSE;
+static gboolean option_version = FALSE;
 
 #define MIN_SUPPORTED_VERSION ((int) 'B')
 #define MAX_SUPPORTED_VERSION ((int) 'C')
@@ -70,6 +71,10 @@ options[] =
     {
       "raw", 'r', 0, G_OPTION_ARG_NONE, &option_raw,
       N_("Show the raw nroff doc instead of piping it through man"), NULL
+    },
+    {
+      "version", 0, 0, G_OPTION_ARG_NONE, &option_version,
+      N_("Show version information and exit"), NULL
     },
     { NULL, 0, 0, 0, NULL, NULL, NULL }
   };
@@ -100,6 +105,12 @@ process_arguments (int *argc, char ***argv,
   g_option_context_set_main_group (context, group);
   ret = g_option_context_parse (context, argc, argv, error);
   g_option_context_free (context);
+
+  if (option_version)
+    {
+      fprintf (stderr, "prevo " VERSION "\n");
+      exit (0);
+    }
 
   if (ret)
     {
