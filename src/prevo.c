@@ -922,9 +922,13 @@ write_string (WriteData *write_data,
                 write_data->state != WRITE_STATE_START_PARAGRAPH) ||
                !g_ascii_isspace (*str))
         {
-          if (write_data->state == WRITE_STATE_START_PARAGRAPH &&
-              write_data->indent_count)
-            fputs (".IP\n", write_data->out);
+          if (write_data->state == WRITE_STATE_START_PARAGRAPH)
+            {
+              if (write_data->indent_count)
+                fputs (".IP\n", write_data->out);
+              else
+                fputs (".PP\n", write_data->out);
+            }
 
           if (write_data->state != write_data->next_state)
             {
