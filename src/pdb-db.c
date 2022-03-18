@@ -1514,6 +1514,8 @@ pdb_db_add_reference_span (PdbDb *db,
                            PdbSpanType span_type,
                            const char *mrk)
 {
+  pdb_db_start_text (state);
+
   PdbSpan *span = pdb_db_start_span (state, span_type);
 
   PdbDbLink *link = g_slice_new (PdbDbLink);
