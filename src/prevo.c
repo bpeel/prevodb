@@ -641,7 +641,7 @@ get_search_term (const char *language,
 
   if (p > word && p[-1] == ':')
     {
-      word_copy = g_memdup (word, p - word);
+      word_copy = g_memdup2 (word, p - word);
       word_copy[p - word - 1] = '\0';
       word = word_copy;
       word_copied = TRUE;
