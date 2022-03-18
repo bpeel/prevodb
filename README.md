@@ -32,19 +32,22 @@ Nun la programo estas instalita ĉe `$HOME/bin`. Kutime tio estas en la
 serĉvojo por programoj en normalaj instaloj de Linukso do vi povas
 simple tajpi ‘prevo’ por startigi ĝin. Tamen unue oni bezonas la
 datumbazon. La pakaĵo inkluzivas duan programon por munti ĝin. Tio
-bezonas la fontodosierojn de la Reta Vortaro. Vi povas trovi tiujn ĉi
-tie:
+bezonas la fontodosierojn de la Reta Vortaro. Vi povas trovi tiujn en
+la jena deponejo:
 
- http://reta-vortaro.de/tgz/index.html
+ https://github.com/revuloj/revo-fonto
 
-Elpaku tiun pakaĵon en unu dosieron:
+Vi ankaŭ bezonas la deponejon “voko-grundo” kiu enhavas kelkajn bazajn
+dosierojn por agordi la datumbazon. Vi povas kopii ambaŭ deponejojn
+per la jenaj komandoj:
 
-    unzip revoxml_2012-09-30.zip
+    git clone https://github.com/revuloj/revo-fonto.git
+    git clone https://github.com/revuloj/voko-grundo.git
 
 Nun vi povas krei la datumbazon per la jenaj komandoj:
 
     mkdir -p ~/.local/share/prevo
-    prevodb -s -i revo -o ~/.local/share/prevo/prevo.db
+    prevodb -s -i revo-fonto -i voko-grundo -o ~/.local/share/prevo/prevo.db
 
 Tio postulas iom da tempo kaj ĝi verŝajne plendos pri kelkaj eraroj.
 Tiuj kutime estas ignoreblaj.
