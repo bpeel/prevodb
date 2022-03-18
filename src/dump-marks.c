@@ -230,7 +230,7 @@ main (int argc, char **argv)
     }
   else
     {
-      revo = pdb_revo_new (argv[1], &error);
+      revo = pdb_revo_new (argv + 1, &error);
 
       if (revo == NULL)
         {

@@ -26,7 +26,7 @@ typedef struct _PdbRevo PdbRevo;
 typedef struct _PdbRevoFile PdbRevoFile;
 
 PdbRevo *
-pdb_revo_new (const char *filename,
+pdb_revo_new (char **filenames,
               GError **error);
 
 PdbRevoFile *

@@ -28,10 +28,15 @@
 #include "pdb-revo.h"
 #include "pdb-error.h"
 
+typedef struct {
+  char *filename;
+  gboolean is_dir;
+} PdbRevoSource;
+
 struct _PdbRevo
 {
-  char *zip_file;
-  gboolean is_dir;
+  int n_sources;
+  PdbRevoSource *sources;
 };
 
 struct _PdbRevoFile
@@ -45,33 +50,39 @@ struct _PdbRevoFile
 };
 
 PdbRevo *
-pdb_revo_new (const char *filename,
+pdb_revo_new (char **filenames,
               GError **error)
 {
-  PdbRevo *revo;
-  struct stat statbuf;
+  PdbRevo *revo = g_slice_new0 (PdbRevo);
 
-  if (stat (filename, &statbuf) == -1)
+  revo->n_sources = g_strv_length (filenames);
+  revo->sources = g_new0 (PdbRevoSource, revo->n_sources);
+
+  for (int i = 0; i < revo->n_sources; i++)
     {
-      g_set_error (error,
-                   G_FILE_ERROR,
-                   g_file_error_from_errno (errno),
-                   "%s: %s",
-                   filename,
-                   strerror (errno));
-      return NULL;
-    }
+      struct stat statbuf;
 
-  revo = g_slice_new (PdbRevo);
-  revo->zip_file = g_strdup (filename);
-  revo->is_dir = !!S_ISDIR (statbuf.st_mode);
+      if (stat (filenames[i], &statbuf) == -1)
+        {
+          g_set_error (error,
+                       G_FILE_ERROR,
+                       g_file_error_from_errno (errno),
+                       "%s: %s",
+                       filenames[i],
+                       strerror (errno));
+          pdb_revo_free (revo);
+          return NULL;
+        }
+
+      revo->sources[i].filename = g_strdup (filenames[i]);
+      revo->sources[i].is_dir = !!S_ISDIR (statbuf.st_mode);
+    }
 
   return revo;
 }
 
 static PdbRevoFile *
-pdb_revo_open_command (PdbRevo *revo,
-                       char **argv,
+pdb_revo_open_command (char **argv,
                        GError **error)
 {
   int child_out, child_err;
@@ -428,23 +439,24 @@ pdb_revo_list_files_handle_data (PdbRevoListFilesData *data,
   return TRUE;
 }
 
-static char **
-pdb_revo_list_files_process (PdbRevo *revo,
+static gboolean
+pdb_revo_list_files_process (const PdbRevoSource *source,
                              const char *glob,
+                             GPtrArray *files,
                              GError **error)
 {
   PdbRevoListFilesData data;
   PdbRevoFile *file;
-  gchar *argv[] = { "unzip", "-l", revo->zip_file, NULL, NULL };
+  gchar *argv[] = { "unzip", "-l", source->filename, NULL, NULL };
   gboolean res = TRUE;
 
-  data.files = g_ptr_array_new ();
+  data.files = files;
   data.line_buf = g_string_new (NULL);
   data.in_list = FALSE;
 
   argv[3] = g_build_filename ("revo", glob, NULL);
 
-  if ((file = pdb_revo_open_command (revo, argv, error)))
+  if ((file = pdb_revo_open_command (argv, error)))
     {
       char buf[512];
       size_t got;
@@ -469,32 +481,17 @@ pdb_revo_list_files_process (PdbRevo *revo,
 
   g_string_free (data.line_buf, TRUE);
 
-  if (res)
-    {
-      g_ptr_array_add (data.files, NULL);
-      return (char **) g_ptr_array_free (data.files, FALSE);
-    }
-  else
-    {
-      int i;
-
-      for (i = 0; i < data.files->len; i++)
-        g_free (g_ptr_array_index (data.files, i));
-
-      g_ptr_array_free (data.files, TRUE);
-
-      return NULL;
-    }
+  return res;
 }
 
-static char **
-pdb_revo_list_files_file (PdbRevo *revo,
+static gboolean
+pdb_revo_list_files_file (const PdbRevoSource *source,
                           const char *glob,
+                          GPtrArray *results,
                           GError **error)
 {
   GPatternSpec *pattern;
   gboolean ret = TRUE;
-  GPtrArray *results;
   char *bn, *dn, *full_dn;
   GDir *dir;
 
@@ -504,14 +501,25 @@ pdb_revo_list_files_file (PdbRevo *revo,
 
   dn = g_path_get_dirname (glob);
 
-  full_dn = g_build_filename (revo->zip_file, dn, NULL);
-  dir = g_dir_open (full_dn, 0, error);
+  GError *local_error = NULL;
+
+  full_dn = g_build_filename (source->filename, dn, NULL);
+  dir = g_dir_open (full_dn, 0, &local_error);
   g_free (full_dn);
 
-  results = g_ptr_array_new ();
-
   if (dir == NULL)
-    ret = FALSE;
+    {
+      if (local_error->domain == G_FILE_ERROR
+          && local_error->code == G_FILE_ERROR_NOENT)
+        {
+          g_error_free (local_error);
+        }
+      else
+        {
+          g_propagate_error (error, local_error);
+          ret = FALSE;
+        }
+    }
   else
     {
       const char *fn;
@@ -527,22 +535,7 @@ pdb_revo_list_files_file (PdbRevo *revo,
 
   g_pattern_spec_free (pattern);
 
-  if (ret)
-    {
-      g_ptr_array_add (results, NULL);
-      return (char **) g_ptr_array_free (results, FALSE);
-    }
-  else
-    {
-      int i;
-
-      for (i = 0; i < results->len; i++)
-        g_free (results->pdata[i]);
-
-      g_ptr_array_free (results, TRUE);
-
-      return NULL;
-    }
+  return ret;
 }
 
 char **
@@ -550,10 +543,36 @@ pdb_revo_list_files (PdbRevo *revo,
                      const char *glob,
                      GError **error)
 {
-  if (revo->is_dir)
-    return pdb_revo_list_files_file (revo, glob, error);
-  else
-    return pdb_revo_list_files_process (revo, glob, error);
+  GPtrArray *results = g_ptr_array_new ();
+
+  for (int i = 0; i < revo->n_sources; i++)
+    {
+      PdbRevoSource *source = revo->sources + i;
+
+      gboolean res = (source->is_dir
+                      ? pdb_revo_list_files_file (source,
+                                                  glob,
+                                                  results,
+                                                  error)
+                      : pdb_revo_list_files_process (source,
+                                                     glob,
+                                                     results,
+                                                     error));
+
+      if (!res)
+        {
+          for (i = 0; i < results->len; i++)
+            g_free (results->pdata[i]);
+
+          g_ptr_array_free (results, TRUE);
+
+          return NULL;
+        }
+    }
+
+  g_ptr_array_add (results, NULL);
+
+  return (char **) g_ptr_array_free (results, FALSE);
 }
 
 static char *
@@ -590,14 +609,14 @@ pdb_revo_expand_filename (const char *filename)
 }
 
 static PdbRevoFile *
-pdb_revo_open_file (PdbRevo *revo,
+pdb_revo_open_file (const PdbRevoSource *source,
                     const char *filename,
                     GError **error)
 {
   char *full_filename;
   int fd;
 
-  full_filename = g_build_filename (revo->zip_file, filename, NULL);
+  full_filename = g_build_filename (source->filename, filename, NULL);
 
   fd = open (full_filename, O_RDONLY, 0);
 
@@ -630,11 +649,11 @@ pdb_revo_open_file (PdbRevo *revo,
 }
 
 static PdbRevoFile *
-pdb_revo_open_process (PdbRevo *revo,
+pdb_revo_open_process (const PdbRevoSource *source,
                        const char *filename,
                        GError **error)
 {
-  char *argv[] = { "unzip", "-p", revo->zip_file, NULL, NULL };
+  char *argv[] = { "unzip", "-p", source->filename, NULL, NULL };
   char *expanded_name;
   char *full_name;
   PdbRevoFile *file;
@@ -644,7 +663,7 @@ pdb_revo_open_process (PdbRevo *revo,
   argv[3] = full_name;
   g_free (expanded_name);
 
-  file = pdb_revo_open_command (revo, argv, error);
+  file = pdb_revo_open_command (argv, error);
 
   g_free (full_name);
 
@@ -656,15 +675,53 @@ pdb_revo_open (PdbRevo *revo,
                const char *filename,
                GError **error)
 {
-  if (revo->is_dir)
-    return pdb_revo_open_file (revo, filename, error);
-  else
-    return pdb_revo_open_process (revo, filename, error);
+  for (int i = 0; i < revo->n_sources; i++)
+    {
+      const PdbRevoSource *source = revo->sources + i;
+
+      GError *local_error = NULL;
+      PdbRevoFile *file = (source->is_dir
+                           ? pdb_revo_open_file (source,
+                                                 filename,
+                                                 &local_error)
+                           : pdb_revo_open_process (source,
+                                                    filename,
+                                                    &local_error));
+
+      if (file == NULL)
+        {
+          if (i < revo->n_sources - 1
+              && local_error->domain == G_FILE_ERROR
+              && local_error->code == G_FILE_ERROR_NOENT)
+            {
+              g_error_free (local_error);
+            }
+          else
+            {
+              g_propagate_error (error, local_error);
+              return NULL;
+            }
+        }
+      else
+        {
+          return file;
+        }
+    }
+
+  g_set_error (error,
+               G_FILE_ERROR,
+               G_FILE_ERROR_NOENT,
+               "%s: Not found",
+               filename);
+
+  return NULL;
 }
 
 void
 pdb_revo_free (PdbRevo *revo)
 {
-  g_free (revo->zip_file);
+  for (int i = 0; i < revo->n_sources; i++)
+    g_free (revo->sources[i].filename);
+  g_free (revo->sources);
   g_slice_free (PdbRevo, revo);
 }

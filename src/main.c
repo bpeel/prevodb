@@ -26,7 +26,7 @@
 
 static gboolean option_single = FALSE;
 static gboolean option_version = FALSE;
-static const char *option_in_file = NULL;
+static char **option_in_files = NULL;
 static const char *option_out_file = NULL;
 
 static GOptionEntry
@@ -37,8 +37,9 @@ options[] =
       N_("Generate a single file instead of a db for Android"), NULL
     },
     {
-      "in", 'i', 0, G_OPTION_ARG_STRING, &option_in_file,
-      N_("The zip file or directory containing the ReVo XML files"), NULL
+      "in", 'i', 0, G_OPTION_ARG_STRING_ARRAY, &option_in_files,
+      N_("The zip file or directory containing the ReVo XML files. "
+         "Can be specified multiple times."), NULL
     },
     {
       "out", 'o', 0, G_OPTION_ARG_STRING, &option_out_file,
@@ -87,7 +88,9 @@ process_arguments (int *argc, char ***argv,
                        _("Unknown option '%s'"), (* argv)[1]);
           ret = FALSE;
         }
-      else if (option_in_file == NULL || option_out_file == NULL)
+      else if (option_in_files == NULL ||
+               *option_in_files == NULL ||
+               option_out_file == NULL)
         {
           g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_BAD_VALUE,
                        _("The -i and -o options are required. See --help"));
@@ -117,7 +120,7 @@ main (int argc, char **argv)
     }
   else
     {
-      revo = pdb_revo_new (option_in_file, &error);
+      revo = pdb_revo_new (option_in_files, &error);
 
       if (revo == NULL)
         {
@@ -157,6 +160,8 @@ main (int argc, char **argv)
           pdb_revo_free (revo);
         }
     }
+
+  g_strfreev(option_in_files);
 
   return ret;
 }
