@@ -68,7 +68,7 @@ get_marks (PdbRevo *revo,
   GHashTable *hash;
   char **file_p;
 
-  files = pdb_revo_list_files (revo, "xml/*.xml", error);
+  files = pdb_revo_list_files (revo, "revo/*.xml", error);
 
   if (files == NULL)
     return NULL;
@@ -184,7 +184,7 @@ dump_missing_references (PdbRevo *revo,
   char **files;
   char **file_p;
 
-  files = pdb_revo_list_files (revo, "xml/*.xml", error);
+  files = pdb_revo_list_files (revo, "revo/*.xml", error);
 
   if (files == NULL)
     return FALSE;

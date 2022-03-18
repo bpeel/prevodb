@@ -2532,7 +2532,7 @@ pdb_db_new (PdbRevo *revo,
                                             (GDestroyNotify) g_free,
                                             pdb_db_free_translation_data_cb);
 
-  files = pdb_revo_list_files (revo, "xml/*.xml", error);
+  files = pdb_revo_list_files (revo, "revo/*.xml", error);
 
   if (files == NULL)
     {
