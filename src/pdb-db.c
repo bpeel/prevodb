@@ -1278,13 +1278,20 @@ typedef struct
   } d;
 } PdbDbParseStackEntry;
 
+typedef enum
+{
+    PDB_DB_QUEUED_SPACE_TYPE_NONE,
+    PDB_DB_QUEUED_SPACE_TYPE_SPACE,
+    PDB_DB_QUEUED_SPACE_TYPE_PARAGRAPH,
+} PdbDbQueuedSpaceType;
+
 typedef struct
 {
   GArray *stack;
   GString *buf;
   PdbDbSpannableString *string;
   PdbList spans;
-  gboolean paragraph_queued;
+  PdbDbQueuedSpaceType queued_space;
   gboolean skip_children;
 } PdbDbParseState;
 
@@ -1351,12 +1358,24 @@ typedef struct
 static void
 pdb_db_start_text (PdbDbParseState *state)
 {
-  if (state->paragraph_queued)
+  if (state->buf->len > 0)
     {
-      if (state->buf->len > 0)
-        g_string_append (state->buf, "\n\n");
-      state->paragraph_queued = FALSE;
+      switch (state->queued_space)
+        {
+        case PDB_DB_QUEUED_SPACE_TYPE_NONE:
+          break;
+
+        case PDB_DB_QUEUED_SPACE_TYPE_SPACE:
+          g_string_append_c (state->buf, ' ');
+          break;
+
+        case PDB_DB_QUEUED_SPACE_TYPE_PARAGRAPH:
+          g_string_append (state->buf, "\n\n");
+          break;
+        }
     }
+
+  state->queued_space = PDB_DB_QUEUED_SPACE_TYPE_NONE;
 }
 
 static PdbSpan *
@@ -1822,7 +1841,8 @@ pdb_db_parse_node (PdbDb *db,
                       {
                         /* Make sure there is a paragraph separator
                          * before and after the remark */
-                        state->paragraph_queued = TRUE;
+                        state->queued_space =
+                          PDB_DB_QUEUED_SPACE_TYPE_PARAGRAPH;
                         pdb_db_parse_push_add_paragraph (state);
                       }
 
@@ -1872,10 +1892,8 @@ pdb_db_parse_node (PdbDb *db,
           {
             if (g_ascii_isspace (*p))
               {
-                if (state->buf->len > 0 &&
-                    state->buf->str[state->buf->len - 1] != ' ' &&
-                    state->buf->str[state->buf->len - 1] != '\n')
-                  g_string_append_c (state->buf, ' ');
+                if (state->queued_space == PDB_DB_QUEUED_SPACE_TYPE_NONE)
+                  state->queued_space = PDB_DB_QUEUED_SPACE_TYPE_SPACE;
               }
             else
               {
@@ -1901,7 +1919,7 @@ pdb_db_parse_spannable_string_upto (PdbDb *db,
 
   state.stack = g_array_new (FALSE, FALSE, sizeof (PdbDbParseStackEntry));
   state.buf = g_string_new (NULL);
-  state.paragraph_queued = FALSE;
+  state.queued_space = PDB_DB_QUEUED_SPACE_TYPE_NONE;
   state.string = string;
 
   pdb_list_init (&state.spans);
@@ -1923,7 +1941,7 @@ pdb_db_parse_spannable_string_upto (PdbDb *db,
           break;
 
         case PDB_DB_STACK_ADD_PARAGRAPH:
-          state.paragraph_queued = TRUE;
+          state.queued_space = PDB_DB_QUEUED_SPACE_TYPE_PARAGRAPH;
           break;
 
         case PDB_DB_STACK_CLOSING_CHARACTER:
