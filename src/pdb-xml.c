@@ -200,6 +200,35 @@ pdb_xml_parse (PdbXmlParser *parser,
   return ret;
 }
 
+static char *
+combine_path (const char *base,
+              const char *relative)
+{
+  size_t base_length = strlen (base);
+
+  while (base_length > 0
+         && g_str_has_prefix (relative, "../"))
+    {
+      relative += 3;
+
+      while (base_length > 0 && base[base_length - 1] == '/')
+        base_length--;
+
+      while (base_length > 0 && base[base_length - 1] != '/')
+        base_length--;
+    }
+
+  if (base_length == 0)
+    return g_strdup (relative);
+
+  char *base_copy = g_strndup (base, base_length);
+  char *full_path = g_build_filename (base_copy, relative, NULL);
+
+  g_free (base_copy);
+
+  return full_path;
+}
+
 static int
 pdb_xml_external_entity_ref_cb (XML_Parser xml_parser,
                                 const XML_Char *context,
@@ -233,7 +262,7 @@ pdb_xml_external_entity_ref_cb (XML_Parser xml_parser,
   pdb_xml_init_parser (parser, external_parser);
 
   if (base)
-    filename = g_strconcat (base, "/", system_id, NULL);
+    filename = combine_path (base, system_id);
   else
     filename = g_strdup (system_id);
 
