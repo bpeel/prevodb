@@ -1366,7 +1366,13 @@ pdb_db_start_text (PdbDbParseState *state)
           break;
 
         case PDB_DB_QUEUED_SPACE_TYPE_SPACE:
-          g_string_append_c (state->buf, ' ');
+          /* We can get doubled-up spaces if the space was flushed
+           * because of the start of a span and the new span also
+           * begins with a space.
+           */
+          if (state->buf->str[state->buf->len - 1] != ' ' &&
+              state->buf->str[state->buf->len - 1] != '\n')
+            g_string_append_c (state->buf, ' ');
           break;
 
         case PDB_DB_QUEUED_SPACE_TYPE_PARAGRAPH:
