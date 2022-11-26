@@ -594,6 +594,19 @@ pdb_db_compare_language_code (const void *a,
   return pdb_strcmp (name_a, name_b);
 }
 
+static void
+trim_trailing_commas (GString *buf)
+{
+  gsize len = buf->len;
+
+  while (len > 0 &&
+         (g_ascii_isspace (buf->str[len - 1]) ||
+          buf->str[len - 1] == ','))
+    len--;
+
+  g_string_truncate (buf, len);
+}
+
 static gboolean
 pdb_db_get_trd_link (PdbDb *db,
                      PdbDocElementNode *trd_elem,
@@ -691,6 +704,10 @@ pdb_db_get_trd_link (PdbDb *db,
           break;
         }
     }
+
+  /* If the root has variants then the text of the kap element will
+   * have trailing commas */
+  trim_trailing_commas (buf);
 
   if (sence_num != -1)
     {
