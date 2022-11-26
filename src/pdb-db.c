@@ -195,6 +195,10 @@ struct _PdbDb
   /* Temporary storage location for the word root. This is only valid
    * while parsing an article */
   char *word_root;
+  /* Hash table of alternative roots. This will only contain anything
+   * while parsing an article. */
+  GHashTable *root_variants;
+
   /* Temporary hash table of the translations indexed by language
    * code. This only contains anything while parsing an article */
   GHashTable *translations;
@@ -384,18 +388,41 @@ pdb_db_append_tld (PdbDb *db,
                    char **atts)
 {
   const char *root = db->word_root;
+  const char *lit = NULL;
+  const char *var;
   char **att;
 
   for (att = atts; att[0]; att += 2)
-    if (!strcmp (att[0], "lit"))
-      {
-        g_string_append (buf, att[1]);
+    {
+      if (!strcmp (att[0], "lit"))
+        {
+          lit = att[1];
+        }
+      else if (!strcmp (att[0], "var"))
+        {
+          var = g_hash_table_lookup (db->root_variants, att[1]);
 
-        if (*root)
-          root = g_utf8_next_char (root);
+          if (var == NULL)
+            {
+              fprintf (stderr,
+                       _("missing variant \"%s\" for root \"%s\"\n"),
+                       att[1],
+                       db->word_root);
+            }
+          else
+            {
+              root = var;
+            }
+        }
+    }
 
-        break;
-      }
+  if (lit)
+    {
+      g_string_append (buf, lit);
+
+      if (*root)
+        root = g_utf8_next_char (root);
+    }
 
   g_string_append (buf, root);
 }
@@ -2299,6 +2326,101 @@ pdb_db_parse_toplevel_dif (PdbDb *db,
   return TRUE;
 }
 
+static gboolean
+get_var_root (PdbDb *db,
+              PdbDocElementNode *var,
+              GError **error)
+{
+  PdbDocElementNode *kap = pdb_doc_get_child_element (&var->node, "kap");
+  PdbDocElementNode *rad;
+  const char *label;
+
+  if (kap == NULL)
+    {
+      g_set_error (error,
+                   PDB_ERROR,
+                   PDB_ERROR_BAD_FORMAT,
+                   _("<var> found in <kap> with no inner <kap>"));
+      return FALSE;
+    }
+
+  rad = pdb_doc_get_child_element (&kap->node, "rad");
+
+  /* Sometimes the variant isn’t marked with a <rad> element and the
+   * value is just spelled out explicitly in the article. */
+  if (rad == NULL)
+    return TRUE;
+
+  label = pdb_doc_get_attribute (rad, "var");
+
+  /* Some articles have a variant that isn’t used in the body of the
+   * article */
+  if (label == NULL)
+    return TRUE;
+
+  g_hash_table_insert (db->root_variants,
+                       g_strdup (label),
+                       pdb_doc_get_element_text (rad));
+
+  return TRUE;
+}
+
+static gboolean
+get_roots (PdbDb *db,
+           PdbDocElementNode *kap,
+           GError **error)
+{
+  PdbDocNode *n;
+  PdbDocElementNode *elem;
+  char *word_root = NULL;
+
+  for (n = kap->node.first_child; n; n = n->next)
+    {
+      if (n->type != PDB_DOC_NODE_TYPE_ELEMENT)
+        continue;
+
+      elem = (PdbDocElementNode *) n;
+
+      if (!strcmp (elem->name, "rad"))
+        {
+          if (word_root != NULL)
+            {
+              g_set_error (error,
+                           PDB_ERROR,
+                           PDB_ERROR_BAD_FORMAT,
+                           _("Multiple <rad> elements found in <kap> with no "
+                             "var attribute"));
+              goto error;
+            }
+
+          word_root = pdb_doc_get_element_text (elem);
+        }
+      else if (!strcmp (elem->name, "var"))
+        {
+          if (!get_var_root (db, elem, error))
+            goto error;
+        }
+    }
+
+  if (word_root == NULL)
+    {
+      g_set_error (error,
+                   PDB_ERROR,
+                   PDB_ERROR_BAD_FORMAT,
+                   _("<kap> tag found with no <rad>"));
+      goto error;
+    }
+
+  db->word_root = word_root;
+
+  return TRUE;
+
+ error:
+  g_free (word_root);
+  g_hash_table_remove_all (db->root_variants);
+  return FALSE;
+}
+
 static PdbDbArticle *
 pdb_db_parse_article (PdbDb *db,
                       PdbDocElementNode *root_node,
@@ -2306,7 +2428,7 @@ pdb_db_parse_article (PdbDb *db,
 {
   PdbDbArticle *article;
   gboolean result = TRUE;
-  PdbDocElementNode *kap, *rad;
+  PdbDocElementNode *kap;
   GQueue sections;
 
   kap = pdb_doc_get_child_element (&root_node->node, "kap");
@@ -2320,18 +2442,9 @@ pdb_db_parse_article (PdbDb *db,
       return NULL;
     }
 
-  rad = pdb_doc_get_child_element (&kap->node, "rad");
+  if (!get_roots (db, kap, error))
+    return NULL;
 
-  if (rad == NULL)
-    {
-      g_set_error (error,
-                   PDB_ERROR,
-                   PDB_ERROR_BAD_FORMAT,
-                   _("<kap> tag found with no <rad>"));
-      return NULL;
-    }
-
-  db->word_root = pdb_doc_get_element_text (rad);
   g_queue_init (&sections);
 
   article = g_slice_new (PdbDbArticle);
@@ -2435,6 +2548,7 @@ pdb_db_parse_article (PdbDb *db,
     result = FALSE;
 
   g_free (db->word_root);
+  g_hash_table_remove_all (db->root_variants);
 
   if (result)
     {
@@ -2558,6 +2672,11 @@ pdb_db_new (PdbRevo *revo,
                                             (GDestroyNotify) g_free,
                                             pdb_db_free_translation_data_cb);
 
+  db->root_variants = g_hash_table_new_full (g_str_hash,
+                                             g_str_equal,
+                                             g_free,
+                                             g_free);
+
   files = pdb_revo_list_files (revo, "revo/*.xml", error);
 
   if (files == NULL)
@@ -2676,6 +2795,7 @@ pdb_db_free (PdbDb *db)
 
   g_hash_table_destroy (db->marks);
   g_hash_table_destroy (db->translations);
+  g_hash_table_destroy (db->root_variants);
 
   g_slice_free (PdbDb, db);
 }
