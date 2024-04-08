@@ -2654,6 +2654,16 @@ pdb_db_add_file_root_mark (PdbDb *db,
   g_free (mark_name);
 }
 
+static int
+compare_string_pointer (const void *pa,
+                        const void *pb)
+{
+  const char *a = *(const char **) pa;
+  const char *b = *(const char **) pb;
+
+  return strcmp (a, b);
+}
+
 PdbDb *
 pdb_db_new (PdbRevo *revo,
             GError **error)
@@ -2704,6 +2714,13 @@ pdb_db_new (PdbRevo *revo,
   else
     {
       char **file_p;
+
+      /* Sort the filenames so that the output will be in a
+       * reproducible order. */
+      qsort (files,
+             g_strv_length (files),
+             sizeof (char *),
+             compare_string_pointer);
 
       for (file_p = files; *file_p; file_p++)
         {
