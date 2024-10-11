@@ -407,7 +407,8 @@ search_trie (const guint8 *trie_start,
         return NULL;
 
       /* Skip the character for this node */
-      child_start = (const guint8 *) g_utf8_next_char (trie_start + 4);
+      child_start = (const guint8 *) g_utf8_next_char ((const char *) trie_start
+                                                       + 4);
 
       /* If this is a valid entry then it is followed by the matching
        * articles which we want to skip */
@@ -451,7 +452,7 @@ search_trie (const guint8 *trie_start,
           if (trie_start + 5 > trie_end)
             return NULL;
 
-          node_ch_len = (g_utf8_next_char (trie_start + 4) -
+          node_ch_len = (g_utf8_next_char ((const char *) trie_start + 4) -
                          (const char *) trie_start - 4);
           if (trie_start + 4 + node_ch_len > trie_end)
             return NULL;
@@ -544,7 +545,7 @@ show_matches (const guint8 *trie_start,
         break;
 
       offset = get_uint32 (search_start);
-      character_len = (g_utf8_next_char (search_start + 4) -
+      character_len = (g_utf8_next_char ((const char *) search_start + 4) -
                        (const char *) search_start - 4);
       children_start = search_start + 4 + character_len;
       old_length = string_buf->len;
@@ -1286,7 +1287,9 @@ extract_article_and_mark (const guint8 *trie_start,
       trie_length &= 0x7fffffff;
 
       if (trie_length < 5 ||
-          (data_start = (const guint8 *) g_utf8_next_char (trie_start + 4)) -
+          (data_start = (const guint8 *) g_utf8_next_char ((const char *)
+                                                           trie_start
+                                                           + 4)) -
           trie_start + 3 > trie_length)
         return;
 
